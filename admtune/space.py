@@ -72,16 +72,20 @@ class Knob:
 
 
 class Space:
-    def __init__(self, knobs: list[Knob], *, memory_bytes: int = 0):
+    def __init__(self, knobs: list[Knob], *, memory_bytes: int = 0, fixed_resources: dict | None = None):
         self.knobs = {k.name: k for k in knobs}
         if not knobs or len(self.knobs) != len(knobs):
             raise ValueError("A nonempty unique fixed knob universe is required")
         self.names = tuple(sorted(self.knobs))
         self.memory_bytes = memory_bytes
+        self.fixed_resources = dict(fixed_resources or {})
 
     @property
     def key(self) -> str:
-        return fingerprint([asdict(self.knobs[n]) for n in self.names])
+        return fingerprint({
+            "knobs": [asdict(self.knobs[n]) for n in self.names],
+            "memory_bytes": self.memory_bytes, "fixed_resources": self.fixed_resources,
+        })
 
     @property
     def defaults(self) -> dict:
@@ -99,11 +103,12 @@ class Space:
         ):
             raise ValueError("innodb_io_capacity exceeds innodb_io_capacity_max")
         if self.memory_bytes:
-            global_bytes = sum(float(full.get(n, 0)) for n in ["innodb_buffer_pool_size", "key_buffer_size"])
-            per_connection = sum(float(full.get(n, 0)) for n in [
+            resources = {**self.fixed_resources, **full}
+            global_bytes = sum(float(resources.get(n, 0)) for n in ["innodb_buffer_pool_size", "key_buffer_size"])
+            per_connection = sum(float(resources.get(n, 0)) for n in [
                 "sort_buffer_size", "join_buffer_size", "read_buffer_size", "read_rnd_buffer_size",
             ])
-            if global_bytes + float(full.get("max_connections", 1)) * per_connection > self.memory_bytes * 0.8:
+            if global_bytes + float(resources.get("max_connections", 1)) * per_connection > self.memory_bytes * 0.8:
                 raise ValueError("Conservative joint memory budget exceeded")
         return full
 

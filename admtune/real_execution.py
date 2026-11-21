@@ -21,11 +21,16 @@ from validators.result_validator import ResultValidator
 from .contracts import Objective, fingerprint
 from .execution import Measurement, RecoveryFailed
 from .space import Space
+from .security import redact
 
 
 ESSENTIAL_INVARIANTS = {
     "innodb_flush_log_at_trx_commit", "sync_binlog", "innodb_doublewrite",
     "transaction_isolation", "performance_schema",
+}
+RESOURCE_KNOBS = {
+    "max_connections", "innodb_buffer_pool_size", "key_buffer_size",
+    "sort_buffer_size", "join_buffer_size", "read_buffer_size", "read_rnd_buffer_size",
 }
 
 
@@ -83,6 +88,18 @@ class AgenticDBExecutor:
     def close(self):
         self.connector.close()
 
+    def diagnose(self) -> dict:
+        workload = self.app.benchmark.workload
+        return {
+            "kind": workload.kind, "mode": workload.mode, "tables": workload.tables,
+            "threads": workload.threads,
+            "runtime_metrics": self.db.show_status([
+                "Threads_running", "Innodb_buffer_pool_reads", "Innodb_buffer_pool_read_requests",
+                "Created_tmp_disk_tables", "Innodb_row_lock_time", "Innodb_data_reads", "Innodb_data_writes",
+            ]),
+            "usage": "Diagnostic prompt context only; not external workload features or causal proof.",
+        }
+
     def readback(self) -> dict:
         raw = self.db.show_variables(list(self.space.names))
         normalized = {}
@@ -104,7 +121,10 @@ class AgenticDBExecutor:
         return self.space.merge(normalized, {})
 
     def invariants(self) -> dict:
-        names = sorted(PROTECTED_KNOBS - {n for n in PROTECTED_KNOBS if n.startswith("skip_")})
+        names = sorted(
+            (PROTECTED_KNOBS - {n for n in PROTECTED_KNOBS if n.startswith("skip_")})
+            | set(self.space.fixed_resources),
+        )
         raw = self.db.show_variables(names)
         if any(raw.get(n) is None for n in ESSENTIAL_INVARIANTS):
             raise ValueError("Cannot verify required MySQL durability/isolation invariants")
@@ -125,6 +145,12 @@ class AgenticDBExecutor:
         version = self.db.get_version()
         if self.app.target.db_version and version.split("-")[0] != self.app.target.db_version:
             raise ValueError(f"Database version mismatch: expected {self.app.target.db_version}, got {version}")
+        resources = self.db.show_variables(sorted(RESOURCE_KNOBS))
+        if not self.simulated and any(resources.get(n) is None for n in RESOURCE_KNOBS):
+            raise ValueError("Cannot validate fixed per-connection/global memory resource context")
+        self.space.fixed_resources = {
+            n: int(v) for n, v in resources.items() if v is not None and n not in self.space.names
+        }
         self.initial = self.snapshot()
         workload = self.app.benchmark.workload
         if min(workload.duration, workload.threads, workload.tables, workload.table_size) <= 0:
@@ -142,9 +168,14 @@ class AgenticDBExecutor:
                 "FROM information_schema.columns WHERE table_schema=DATABASE() "
                 "ORDER BY TABLE_NAME,ORDINAL_POSITION;"
             )
+            indexes = self.db.query_rows(
+                "SELECT TABLE_NAME,INDEX_NAME,SEQ_IN_INDEX,COLUMN_NAME,NON_UNIQUE "
+                "FROM information_schema.statistics WHERE table_schema=DATABASE() "
+                "ORDER BY TABLE_NAME,INDEX_NAME,SEQ_IN_INDEX;"
+            )
             readiness = {
                 "sysbench_version": version_result.stdout.strip(), "table_count": int(rows[0][0]),
-                "live_schema_hash": fingerprint(schema),
+                "live_schema_hash": fingerprint({"columns": schema, "indexes": indexes}),
                 "server_identity": self.connector.run("hostname; uname -srm; nproc", check=True).stdout.strip(),
                 "datadir": self.db.query_rows("SELECT @@datadir;"),
             }
@@ -180,7 +211,7 @@ class AgenticDBExecutor:
             if restored != snapshot.file_content:
                 raise ValueError("Configuration file restoration mismatch")
         except Exception as exc:
-            raise RecoveryFailed(f"Snapshot restoration failed: {exc}") from exc
+            raise RecoveryFailed(redact(f"Snapshot restoration failed: {exc}")) from exc
 
     @staticmethod
     def complete_sysbench(output: str, expected_seconds: int) -> bool:
@@ -233,9 +264,11 @@ class AgenticDBExecutor:
                 metadata={"simulated": self.simulated, "p95_latency_ms": result.p95_latency_ms,
                           "benchmark_log": f"benchmark-{self.counter}.log"},
             )
-        except Exception as exc:
+        except BaseException as exc:
             self._restore_snapshot(before)
-            return Measurement(None, "execution_failed", False, False, False, {"reason": str(exc)})
+            if not isinstance(exc, Exception):
+                raise
+            return Measurement(None, "execution_failed", False, False, False, {"reason": redact(str(exc))})
 
     def restore(self, config: dict):
         if not self.allow_mutations:

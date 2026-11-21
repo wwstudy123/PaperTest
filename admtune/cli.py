@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, replace
+from dataclasses import asdict
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-import platform
-import subprocess
 
 import numpy as np
 
@@ -19,6 +17,7 @@ from .memory import Store
 from .reflection import Reflector
 from .space import Knob, Space
 from .workload import PhaseDetector, Window, WorkloadEncoder
+from .provenance import source_provenance
 
 
 VARIANTS = ["full", "single-slice", "no-memory", "no-surrogate", "no-reflection", "full-reflection", "additive"]
@@ -66,15 +65,12 @@ def run_simulation(*, output: Path, seed: int = 0, scenario: str = "aba", varian
         reflector=Reflector(store, backend, mode=reflection_mode), store=store,
         ledger=ledger, policy=policy, seed=seed,
     )
-    try:
-        revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
-    except (OSError, subprocess.CalledProcessError):
-        revision = "unavailable"
     manifest = {
         "simulated": True, "seed": seed, "scenario": scenario, "variant": variant,
         "environment": asdict(environment), "space": space.describe(), "space_key": space.key,
+        "fixed_resource_context": space.fixed_resources,
         "encoder": encoder.metadata(), "policy": asdict(policy), "budget": asdict(ledger.limits),
-        "python": platform.python_version(), "git_revision": revision,
+        **source_provenance(),
         "created_at": datetime.now(timezone.utc).isoformat(),
         "thresholds": {"change": 3.0, "stable": 1.5, "calibration": "synthetic fixture only"},
         "backend": "heuristic fixture; no API calls",

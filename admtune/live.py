@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
-import subprocess
+import time
 
 from dotenv import load_dotenv
 import yaml
@@ -23,6 +23,8 @@ from .real_execution import AgenticDBExecutor
 from .reflection import Reflector
 from .space import Knob, Space
 from .workload import PhaseDetector, Window, WorkloadEncoder
+from .security import redact
+from .provenance import source_provenance
 
 
 def load_space(path: Path, *, memory_bytes: int) -> Space:
@@ -104,10 +106,12 @@ def main() -> int:
     args = parser.parse_args()
     if args.command != "preflight" and not args.dedicated_instance:
         parser.error("Live measurements require --dedicated-instance; never use production.")
+    if args.delta and args.command != "pilot":
+        parser.error("--delta is supported only by the manual pilot command.")
     if args.command == "tune-static" and args.backend == "llm" and not args.allow_paid_llm:
         parser.error("LLM requests require --allow-paid-llm.")
-    if args.command == "tune-static" and args.trials < 6:
-        parser.error("Reserve at least six slots for baseline, startup and verification.")
+    if args.command == "tune-static" and args.trials < 8:
+        parser.error("Reserve at least eight slots for baseline, startup, search and verification.")
     load_dotenv(args.env_file)
     args.output.mkdir(parents=True, exist_ok=False)
     root = Path(__file__).resolve().parent.parent
@@ -130,6 +134,7 @@ def main() -> int:
         max_p95_ms=float(extra.get("max_p95_ms", 1000)),
     )
     result = {}
+    started = time.monotonic()
     restore_failed = False
     exit_code = 0
     try:
@@ -140,7 +145,7 @@ def main() -> int:
         else:
             environment = Environment(
                 "mysql", preflight["db_version"], extra["hardware_id"], extra["data_id"],
-                extra["schema_id"], fingerprint({
+                fingerprint([extra["schema_id"], preflight["readiness"].get("live_schema_hash")]), fingerprint({
                     "benchmark": asdict(app.benchmark), "constraints_p95_ms": executor.max_p95_ms,
                 }), space.key + ":static",
             )
@@ -148,14 +153,12 @@ def main() -> int:
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "simulated": False, "command": args.command, "backend": args.backend,
                 "seed": args.seed, "environment": asdict(environment),
-                "space": space.describe(), "benchmark": asdict(app.benchmark),
+                "space": space.describe(), "fixed_resource_context": space.fixed_resources,
+                "benchmark": asdict(app.benchmark),
                 "initial_preflight": preflight, "data_snapshot_restored_by_harness": False,
                 "note": "Static only. Dynamic real offered-load replay is a later deployment gate.",
+                **source_provenance(),
             }
-            try:
-                manifest["git_revision"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-            except (OSError, subprocess.CalledProcessError):
-                manifest["git_revision"] = "unavailable"
             (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
             if args.command == "pilot":
                 delta = json.loads(args.delta.read_text()) if args.delta else {}
@@ -172,7 +175,7 @@ def main() -> int:
                     llm_calls=args.llm_calls, llm_tokens=args.llm_tokens,
                 )
     except Exception as exc:
-        result = {"error": str(exc), "simulated": False}
+        result = {"error": redact(str(exc)), "simulated": False}
         exit_code = 1
     finally:
         if args.command != "preflight":
@@ -180,9 +183,11 @@ def main() -> int:
                 executor.restore_initial()
                 result["initial_configuration_restored"] = executor.initial is not None
             except Exception as exc:
-                result["recovery_error"] = str(exc)
+                result["recovery_error"] = redact(str(exc))
                 restore_failed = True
         executor.close()
+        result["total_wall_seconds_including_preflight_and_restore"] = time.monotonic() - started
+        result["backend"] = args.backend if args.command == "tune-static" else "manual_or_preflight"
         (args.output / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result, indent=2))
     return 2 if restore_failed else exit_code

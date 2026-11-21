@@ -54,12 +54,26 @@ class SpaceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             space.merge(space.defaults, {"sort_buffer_size": 100})
 
+    def test_untuned_connections_still_count_in_memory_budget(self):
+        space = Space([
+            Knob("sort_buffer_size", "integer", 1, 1, 100),
+        ], memory_bytes=1000, fixed_resources={"max_connections": 100})
+        with self.assertRaises(ValueError):
+            space.merge(space.defaults, {"sort_buffer_size": 100})
+
     def test_team_produces_valid_full_configs(self):
         team = Team(self.space, HeuristicBackend(8))
         team.initialize([0.0], [])
         for candidate in team.recommend(self.space.defaults, "p1", [0.0], []):
             self.space.merge(candidate.config, {})
             self.assertEqual(set(candidate.config), set(self.space.names))
+
+    def test_diagnostics_are_role_context_not_workload_vector(self):
+        team = Team(self.space, HeuristicBackend(8))
+        z = [0.0]
+        team.initialize(z, [], diagnostics={"Threads_running": 8})
+        self.assertEqual(team.diagnostics["Threads_running"], 8)
+        self.assertEqual(z, [0.0])
 
 
 class WorkloadTests(unittest.TestCase):
@@ -200,6 +214,17 @@ class MemoryTests(unittest.TestCase):
         with self.assertRaises(sqlite3.IntegrityError):
             self.store.commit_reflection(payload, ["t1"])
         self.assertEqual(len(self.store.reflections()), 1)
+
+    def test_omitted_new_fact_cannot_be_silently_consumed(self):
+        self.store.append(Trial("t2", "p1", "env", "tps:maximize", {}, [0], "timeout"))
+        payload = {
+            "facts": [{"trial_id": "t1", "status": "measured", "value": 10}],
+            "hypotheses": [], "conditions": {"environment_key": "env", "objective_key": "tps:maximize"},
+            "actions": [], "evidence_ids": ["t1", "t2"],
+        }
+        with self.assertRaises(ValueError):
+            self.store.commit_reflection(payload, ["t1", "t2"])
+        self.assertEqual(len(self.store.pending()), 2)
 
 
 if __name__ == "__main__":

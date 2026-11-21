@@ -34,6 +34,18 @@ Real dynamic replay and OLAP are not yet claimed as implemented or validated.
 **The inherited `agenticdb` command below is upstream reference, not the
 ADMTune entry point.** Use `--dbms-only` when evaluating its restricted baseline.
 
+## Reproducible synthetic ablation matrix
+
+```sh
+.venv/bin/python -m admtune.experiments --simulate \
+  --scenario aba --seeds 0 1 2 --trials 24 \
+  --output runs/aba-suite-001
+```
+
+This runs seven variants with three seeds and writes ignored JSON/CSV audit
+reports. It never launches a live experiment or calls an API.
+See [`docs/STATUS.md`](docs/STATUS.md) for completed and pending gates.
+
 ## Upstream AgenticDB reference
 
 Core implementation for the AgenticDB paper.

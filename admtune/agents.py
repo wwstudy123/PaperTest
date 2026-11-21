@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import math
-from pathlib import Path
 import random
 from typing import Protocol
 
@@ -138,11 +137,16 @@ class Team:
         self.ranges: dict = {}
         self.generation = 0
         self.feedback: dict = {}
+        self.diagnostics: dict = {}
 
-    def initialize(self, context: list[float], experiences: list[dict]):
+    def initialize(self, context: list[float], experiences: list[dict], *, diagnostics: dict | None = None):
+        if diagnostics is not None:
+            self.diagnostics = diagnostics
         payload = {"catalog": self.space.describe(), "context": context,
                    "experiences": experiences[:5], "max_selected": self.max_selected,
-                   "feedback": self.feedback}
+                   "feedback": self.feedback, "diagnostics": self.diagnostics,
+                   "fixed_resource_context": self.space.fixed_resources,
+                   "host_memory_budget_bytes": self.space.memory_bytes}
         selected = self.backend.complete("selector", payload).get("selected")
         if (
             not isinstance(selected, list) or not selected or len(set(selected)) != len(selected)
@@ -188,6 +192,9 @@ class Team:
             "parent": parent, "context": context, "experiences": experiences[:5],
             "batch_size": self.batch_size,
             "generation": self.generation, "feedback": self.feedback,
+            "diagnostics": self.diagnostics,
+            "fixed_resource_context": self.space.fixed_resources,
+            "host_memory_budget_bytes": self.space.memory_bytes,
         })
         deltas = output.get("candidates")
         if not isinstance(deltas, list) or not 1 <= len(deltas) <= self.batch_size:

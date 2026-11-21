@@ -98,10 +98,20 @@ class Controller:
         except (ValueError, BudgetExhausted, RuntimeError) as exc:
             self.store.event("reflection_deferred", {"reason": str(exc)})
 
+    def diagnostics(self) -> dict:
+        diagnose = getattr(self.executor, "diagnose", None)
+        if diagnose is None:
+            return {}
+        try:
+            return diagnose()
+        except Exception as exc:
+            self.store.event("diagnostics_unavailable", {"reason": str(exc)})
+            return {"available": False}
+
     def observe(self, window: Window):
         state = self.detector.observe(window)
         self.last_context = state.context
-        self.store.event("workload", asdict(state))
+        self.store.event("workload", {**asdict(state), "window_end": window.end})
         if state.event == "change_confirmed":
             self.reflect(["phase_end"], force=True)
             self.active = False
@@ -124,7 +134,7 @@ class Controller:
             return
         self.baseline = self.best_value = baseline.value
         self.best_config = dict(self.current)
-        self.team.initialize(context, self.experiences(context))
+        self.team.initialize(context, self.experiences(context), diagnostics=self.diagnostics())
         self.active = True
         self.gp.fitted = False
 
@@ -140,6 +150,15 @@ class Controller:
         before = dict(self.current)
         try:
             measured = self.executor.measure(config, context)
+        except KeyboardInterrupt:
+            self.store.append(Trial(
+                trial_id, self.phase_id, self.environment.key, self.objective.key,
+                config, context, "interrupted", prediction=prediction_dict,
+                metadata={"kind": kind, "simulated": self.executor.simulated},
+            ))
+            self.active = False
+            self.executor.restore(before)
+            raise
         except RecoveryFailed as exc:
             record = Trial(
                 trial_id, self.phase_id, self.environment.key, self.objective.key,
@@ -151,6 +170,13 @@ class Controller:
             raise
         except Exception as exc:
             measured = Measurement(None, "execution_failed", False, False, False, {"reason": str(exc)})
+        if measured.value is not None and (
+            isinstance(measured.value, bool) or not isinstance(measured.value, (float, int))
+            or not math.isfinite(measured.value) or measured.value <= 0
+        ):
+            measured = Measurement(None, "invalid_measurement", False, measured.effective, False, {
+                **measured.metadata, "invalid_value": repr(measured.value),
+            })
         record = Trial(
             trial_id, self.phase_id, self.environment.key, self.objective.key, config,
             list(context), measured.status, measured.value, measured.complete,
@@ -195,6 +221,7 @@ class Controller:
             return None
         self.ledger.ensure_time()
         z = self.last_context
+        self.team.diagnostics = self.diagnostics()
         self.fit(z)
         for _ in range(self.policy.max_batches):
             candidates = self.team.recommend(self.best_config, self.phase_id, z, self.experiences(z))

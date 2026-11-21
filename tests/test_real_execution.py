@@ -137,6 +137,13 @@ class RealAdapterTests(unittest.TestCase):
         self.executor.restore_initial()
         self.assertEqual(self.executor.readback(), self.before)
 
+    def test_keyboard_interrupt_restores_before_propagating(self):
+        candidate = self.space.merge(self.before, {"innodb_io_capacity": 400})
+        with patch("admtune.real_execution.run_benchmark", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                self.executor.measure(candidate, [0])
+        self.assertEqual(self.executor.readback(), self.before)
+
     def test_static_controller_with_fake_agenticdb_adapter(self):
         output = Path(self.temp.name) / "static"
         output.mkdir()

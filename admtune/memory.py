@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import math
 import sqlite3
 from pathlib import Path
 
@@ -94,6 +93,8 @@ class Store:
         }
         if not payload["facts"] or any(canonical(f) not in allowed_facts for f in payload["facts"]):
             raise ValueError("Observed facts must match stored evidence exactly")
+        if not set(new_ids) <= {fact["trial_id"] for fact in payload["facts"]}:
+            raise ValueError("Do not consume new evidence omitted from the observed facts")
         if any(not isinstance(h, str) for h in payload["hypotheses"]):
             raise ValueError("Hypotheses must be text, not executable rules")
         if any(a not in {"resample", "adjust_range", "reselect", "verify", "stop"} for a in payload["actions"]):
