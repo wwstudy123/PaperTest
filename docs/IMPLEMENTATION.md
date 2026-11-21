@@ -1,61 +1,47 @@
-# ADMTune implementation and experiment gates
+# ADMTune 实施方案与实验门槛
 
-## Provenance
+## 来源与调整范围
 
-- Upstream: https://github.com/xinyueyangiscas/AgenticDB
-- Starting commit: `321cb7ca350bbf382e7a1696ccfff859ac53f315`
-- License: upstream MIT license is retained.
-- AgentTune supplies the task decomposition, not copied unlicensed source.
-- ADWTune, OnlineTune and Reflexion supply research ideas discussed in the thesis.
+- 执行基础来自 AgenticDB：https://github.com/xinyueyangiscas/AgenticDB。
+- 起始提交：`321cb7ca350bbf382e7a1696ccfff859ac53f315`，保留 MIT 许可证。
+- 参考 AgentTune 的任务分工，不直接复制未明确授权的源码。
+- ADWTune、OnlineTune 和 Reflexion 提供论文中说明的技术思路。
+- 当前分支只保留数据库参数调整。系统参数候选空间、执行与回退工具、阶段切换、启发式建议及相关配置已删除。
+- CPU、内存、磁盘和 I/O 只读指标用于诊断，不构成系统调优功能。
 
-## Fixed design
+## 确定的方法规则
 
-1. DBMS-only actions; no OS writes, OS repair, or phase transitions to OS.
-2. Programmatic external-workload monitoring, separate from runtime diagnosis.
-3. Parameter selection, preferred-range pruning, and multi-candidate generation.
-4. Full fixed-space configuration encoding, deterministic validation and deduplication.
-5. GP targets `log(TPS)` or `-log(complete latency)`, separately by objective.
-   Phase baselines are used for utility and admission, never to relabel history.
-6. Pretrial predictions are persisted before observations update the model.
-7. Only complete, effective, compatible observations enter the GP.
-8. Real execution owns snapshots, readback, warmup, measurement, and recovery.
-9. Event-triggered reflection consumes evidence IDs only after validated durable write.
-10. Trial, wall-clock and LLM-call/token budgets never reset on workload changes.
+1. 外部请求用于负载阶段识别，数据库运行指标只用于诊断与运行约束。
+2. 参数选择、范围裁剪和多候选推荐按任务分工组织，由控制器统一调度。
+3. 候选继承父配置后还原为固定参数全集中的完整向量，执行前校验并去重。
+4. 分任务建模 `log(TPS)` 或 `-log(完整执行时间)`；阶段基准只用于收益与准入比较。
+5. 试验前保存预测，试验后再更新数值模型，禁止用更新后的拟合值评价此前预测。
+6. 只有配置生效、测量完整、条件兼容的观测才能训练；故障或超时不能人为补成普通标签。
+7. 配置接受与恢复由有效实测结果决定，预测偏差不直接等于配置失败。
+8. 反思采用事件触发和证据编号去重，校验与持久化成功后才消费新增证据。
+9. 工作负载切换不重置总试验次数、墙钟时间和模型调用预算。
+10. 不以放松持久性、隔离级别、观测能力或改变压测输入获得不等价收益。
 
-## Incremental delivery
+## 分阶段交付
 
-| Stage | Gate before committing and pushing |
+| 阶段 | 提交和推送前的门槛 |
 |---|---|
-| 0 Repository hygiene | Ignore credentials, data, outputs, backups; retain provenance |
-| 1 DBMS-only substrate | Tests prove OS actions/transitions are rejected |
-| 2 Offline ADMTune | Tests for workload state, GP, agents, memory and reflection; deterministic simulator |
-| 3 Real execution adapter | Fake-connector tests for apply/readback/rollback; explicit opt-in preflight |
-| 4 Experiment protocols | Smoke/synthetic ablations, provenance and cost reports; no fabricated DB results |
-| 5 Dedicated server pilot | User supplies environment; validate baseline and recovery before LLM calls |
-| 6 Formal experiments | Frozen configs/seeds, independent repetitions and final remeasurement |
+| 仓库整理 | 排除凭证、数据、运行结果和备份，记录代码来源 |
+| 数据库执行基础 | 仅存在数据库动作，平台期直接停止，不保留系统调优分支 |
+| 离线闭环 | 测试阶段识别、角色交互、代理预测、记忆和反思 |
+| 实机适配 | 模拟连接器验证应用、回读、测量和恢复；真实执行必须显式授权 |
+| 实验编排 | 固定种子、消融与审计报告，明确模拟结果不是性能证据 |
+| 专用实例首轮试验 | 先核验基准、配置生效与恢复，再接入模型 |
+| 正式实验 | 固定协议和预算，独立重复，最终配置另行复测 |
 
-Each completed implementation stage is a separate tested commit pushed to the
-user repository. A failed push is reported; it is never described as synchronized.
-Paid LLM calls and live database mutations require an explicit run command and are
-not performed during implementation.
+每个完成阶段经测试后独立提交、推送。推送失败必须如实报告。开发过程不自动调用付费模型，不连接或修改真实数据库。
 
-## Stage 1 baseline restriction
+## 基线和比较边界
 
-`agenticdb --dbms-only ...` restricts the inherited baseline to database actions.
-The auditor stops rather than switching to OS tuning. Deterministic proposal and
-repair checks reject durability, isolation and instrumentation changes. This
-restricted method must be labeled separately from full upstream AgenticDB.
-
-## Evaluation boundaries
-
-- Keep upstream AgenticDB available for provenance; its original entry point is
-  not the ADMTune real-run safety boundary.
-- Label the restricted baseline `AgenticDB-DBMS-only`, not full AgenticDB.
-- AgentTune is a separate method baseline, not the same as a surrogate ablation.
-- Synthetic simulator output validates plumbing only; it is not thesis evidence.
-- Start with static Sysbench and composition A-B-A. Rate-capped experiments need
-  independent offered-load telemetry and a separately defined latency objective.
-- Same initial state, knob universe, objective, measurement protocol and budgets
-  are required for comparable real experiments.
-- Reflection comparisons: none, event/full-history, event/incremental.
-- Final configuration performance must be independently remeasured.
+- 当前 `agenticdb` 入口是数据库层裁剪版，无需启用开关；原版历史可从起始提交追溯。
+- 对照名称使用 `AgenticDB-DBMS-only`，不得宣称复现了原版全部能力。
+- AgentTune 是独立方法基线，不能用启发式生成器或无代理消融冒充。
+- 所有真实对照统一初始状态、合法参数全集、优化目标、测量协议和预算。
+- 首先验证静态 Sysbench 与组成切换 A→B→A；限速场景另行定义发送强度、延迟目标和完成率。
+- 反思应比较无反思、事件触发全量反思、事件触发增量反思，不能仅比较有无反思。
+- 最终选中配置需要独立复测，不能直接报告搜索过程中带有选择偏差的最大值。

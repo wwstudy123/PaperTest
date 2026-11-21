@@ -1,63 +1,60 @@
+# 数据库参数调优规划提示词
+
 {{task_brief}}
 
-Below are the complete reference files provided to you in this input. Use their contents as if the user had uploaded them directly. You must first read the benchmark script file, and then determine which global parameters to tune in the next round based on the current parameters, state_metric, and historical tuning results.
+## 输入资料
+
+以下是本轮提供的压测参考文件：
 
 {{benchmark_files}}
 
-First use `workload_interpretation` in the JSON below as the preliminary workload identification, and then cross-check it against the benchmark script and the command that is actually executed. Do not misidentify a `mode: read` workload as readwrite merely because the wrapper script contains readwrite/write branches that are not executed. Tuning directions must primarily follow `workload_interpretation.primary_tuning_directions` and `workload_interpretation.knobs_to_prioritize`; treat `workload_interpretation.knobs_to_deprioritize` as a primary direction only when state_metric provides clear counterevidence.
+先读取 `workload_interpretation`，再与实际执行的脚本、模式和命令核对。不能因为脚本中存在未执行的读写分支，就把只读负载误判为读写负载。
 
-The current initial parameters are in `current_config` and `allowed_knob_space` in the JSON below. `allowed_knob_space` is the candidate global parameter space, and the current values have been retrieved again through the interface. Do not modify database parameters that are not in this space.
+当前调整阶段为 `{{current_phase}}`。仅允许调整数据库参数，没有其他可切换的参数层级。
 
-If a candidate parameter is marked `persistable=false` in `allowed_knob_space`, it may only be tried as an online runtime parameter and must not be treated as a static parameter that needs to be written to a startup configuration file. Do not make the configuration depend on it taking effect after a restart.
+## 参数与收益规则
 
-If `allowed_knob_space` contains additional entries from multiple candidate sources, you may evaluate these candidates together, but do not guess or modify parameters that do not appear in `allowed_knob_space`. AgenticDB's configuration, candidate space, and Validator are responsible for cross-DBMS isolation, parameter-name validity, and range checks.
+1. `allowed_knob_space` 是唯一候选目录。不得虚构参数、扩大硬边界或修改压测输入。
+2. `current_config` 与目录中的当前值来自实际回读。候选未改字段由控制器继承。
+3. `persistable=false` 的参数只能在线生效，不得依赖写入启动文件或重启后仍生效。
+4. 保持持久性、事务隔离、一致性和观测能力不变，不以放松这些语义追求分数。
+5. 依据当前负载、资源诊断、兼容历史和最新执行反馈规划。系统指标仅供诊断，不是可修改对象。
+6. 可以描述整体数据库配置计划，但本轮执行项必须只包含合法且有依据的参数变更；不强制凑满参数数量。
+7. 优化目标以 `objective` 为准。TPS、TPS/P95 和完整查询执行时间不能互相替换。
+8. 未完整完成的测量不能视为成功。组合调整只能确认组合效果，不直接推断单参数因果关系。
+9. 后续轮次不重复首轮完整解释；保留成功方向，避免重复已核验失败组合。
+10. 不输出 shell 命令、内核参数或系统控制项。数据库配置应用、重启、预热和恢复均由控制器执行。
 
-In the first round, you must first develop a globally better configuration plan based on `allowed_knob_space`, rather than selecting only a small number of knobs in isolation. In `global_config_plan`, explain how you group and evaluate the global candidate space, which parameters you plan to change, which ones you will keep unchanged, and why. At the same time, `candidate_config` in the first round must also be an executable global candidate configuration, rather than one or two local probes. For the first DB round, it should cover the primary subsystems identified by `workload_interpretation`. Do not force redo/binlog/durability to be the primary sources of benefit for a read-only workload; redo, binlog, flush, and the write path should be primary considerations only for readwrite/write workloads. If the first round contains fewer than 8 DB knobs, you must clearly explain in `diagnosis` why a global multi-knob attempt cannot be made. Only in subsequent rounds may you use smaller incremental changes to isolate causes or fine-tune the configuration.
+## 后续动作与停止建议
 
-If the current objective is a pure benchmark limit and `allowed_knob_space` contains risky candidate parameters or candidates that require a restart, you may select a more aggressive `benchmark_max` route based on the workload, state_metric, current configuration, and historical results. Set `restart_required=true` for static candidates, and clearly state in `risk` that crash safety, recoverability, observability, or production safety may be sacrificed. Do not write shell commands yourself. Put the global/startup parameters to be validated directly in `candidate_config`; AgenticDB will handle configuration persistence, restart, warmup, and benchmark validation.
+`action_type` 只能是 `db_config` 或 `repeat_benchmark`。重复测量时 `candidate_config` 必须为空。
 
-In subsequent rounds, do not repeat the complete explanation from the first round. Instead, continue improving the same objective based on the existing context, historical success/failure results, the latest state_metric, and `objective` in the JSON. If `objective.direction=minimize` and the target is `time_ms`/`execution_time`, use only the decrease in the duration of the complete execute phase as the improvement objective; do not switch to optimizing tps/p95. If the target is `tps_over_p95`, continue trying to achieve a higher tps/p95. The tuning results from all previous sessions and the completed rounds of this session are in `tuning_history_summary` in the JSON below. They include the configuration tried each time, whether it succeeded or failed, the resulting primary-objective value/score, and the reason for rollback/acceptance. You must carry these results forward. Successful directions may be fine-tuned further, and failed combinations must not be repeated. If a failure occurred only because an online SET was not permitted and a restart was required, you may switch to a static restart route and validate it again.
+`auditor_recommendation.next_phase` 只能是 `db` 或 `stop`。数据库搜索达到平台期后建议停止，不建议其他调整层级。是否接受候选、何时停止，由控制器和有效实测决定。
 
-The current server's state_metric is in `db_metrics` and `os_metrics` in the JSON below. You need to improve the primary objective specified in the JSON after a small number of attempts by considering state_metric, the current parameters, the initial benchmark, and the history from the most recent rounds. For an `execution_time` objective, TPS and p95 may only be used for auxiliary diagnosis and cannot replace elapsed time as the basis for optimization.
+## 输出结构
 
-The current phase is `{{current_phase}}`. If the current phase is `db`, return only a database global-parameter configuration. If the current phase is `os_sysctl`, return only kernel sysctl parameters from `allowed_os_knob_space` and set `action_type` to `os_config`. If the current phase is `os_control`, return only system controls from `allowed_os_control_space` and set `action_type` to `os_control`. Phase switching is determined by the Auditor.
-
-Return only one JSON object in the following format:
+只返回一个 JSON 对象，字段名保留如下。以下为结构示例，具体参数必须来自候选目录：
 
 ```json
 {
-  "diagnosis": "Describe the bottleneck you identified from the script, current parameters, state_metric, and history",
-  "global_config_plan": {
-    "summary": "In the first round, provide a globally better configuration plan; in subsequent rounds, describe the global adjustment strategy relative to the current best result",
-    "change_groups": {
-      "memory": ["Knobs to adjust or retain and the reasons"],
-      "redo_binlog": ["Knobs to adjust or retain and the reasons"],
-      "io_flush": ["Knobs to adjust or retain and the reasons"],
-      "concurrency_cpu": ["Knobs to adjust or retain and the reasons"],
-      "benchmark_max_static": ["If using a static pure-benchmark route, list the startup settings and risks"]
-    }
-  },
-  "action_type": "db_config | os_config | os_control | repeat_benchmark",
-  "candidate_config": {
-    "key": "value"
-  },
+  "diagnosis": "依据观测的瓶颈判断与本轮依据",
+  "action_type": "db_config",
+  "candidate_config": {},
   "restart_required": false,
-  "expected_effect": "Explain how the primary objective specified by objective is expected to improve; for example, explain why time_ms should decrease for an execution_time objective, or why tps/p95 should increase for a tps_over_p95 objective",
-  "risk": "Explain the risks, such as restart, memory, I/O, crash safety, or noise",
+  "expected_effect": "待验证的预期效果，不是实测结论",
+  "risk": "适用条件、潜在退化与恢复要求",
   "validation_required": true,
-  "exploration_mode": "conservative | normal | aggressive | benchmark_max",
-  "next_step": "Instructions to carry forward to the next-round conversation: if this round succeeds or nearly succeeds, specify which direction should be fine-tuned next",
-  "if_failed_next": "Post-failure instructions to carry forward to the next-round conversation: if this round is rolled back, specify which knobs/directions to avoid next and which alternative to try",
-  "more_aggressive_plan": {
-    "rationale": "If the current plan is not aggressive enough, explain the more aggressive route and why it was not adopted immediately or why it can be adopted in the next round",
-    "aggressive_candidate_config": {
-      "key": "value"
-    }
-  },
+  "global_config_plan": {},
+  "exploration_mode": "normal",
+  "next_step": "成功后的后续验证",
+  "if_failed_next": "失败后的候选或范围修正",
+  "more_aggressive_plan": {},
   "auditor_recommendation": {
-    "next_phase": "db | os_sysctl | os_control | stop",
-    "reason": "Phase recommendation for the Auditor. Use db while there are still clear global parameter combinations to try on the DB side. Do not conclude that the DB layer has reached its limit because of one or two failed rounds or one repeat_benchmark. Recommend os_sysctl only after multiple DB global-parameter combinations have been validated and there are no clear DB candidates in next_step/more_aggressive_plan. Use os_control when sysctl tuning has also plateaued and system controls such as THP/CPU/block need to be tried. Use stop only when the system-control layer has also reached its limit",
-    "confidence": "low | medium | high"
+    "next_phase": "db",
+    "reason": "继续或停止的证据",
+    "confidence": "medium"
   }
 }
 ```
+
+不得将未经执行的配置标记为成功，也不得把推测写成已验证事实。

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-import shlex
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 from connectors.ssh_connector import SSHConnector
 from models import BackupRecord
@@ -37,8 +35,3 @@ def rollback_db_config(
     connector.write_file(backup.config_path, content, sudo=True)
     if restart_required:
         restart_db(connector, service_name)
-
-
-def rollback_os_config(connector: SSHConnector, previous_values: dict[str, Any]) -> None:
-    for key, value in previous_values.items():
-        connector.run(f"sysctl -w {shlex.quote(f'{key}={value}')}", sudo=True, check=True)

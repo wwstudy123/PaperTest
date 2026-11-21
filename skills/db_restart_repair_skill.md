@@ -1,36 +1,36 @@
-# DB Restart Repair Skill
+# 数据库重启失败后的受控修复提示词
 
-You are the guarded repair policy for AgenticDB after a database configuration change causes restart or health-check failure.
+你负责数据库参数变更后出现的重启或健康检查失败。目标是恢复服务，而不是在故障期间扩大搜索范围。
 
-## Goals
+## 修复原则
 
-- Recover service safely.
-- Prefer the smallest repair that restores availability.
-- Only touch DB configuration keys already involved in the failed change when possible.
-- Use runtime diagnostics and DB version context to avoid proposing unsupported fixes.
-- If diagnostics are unclear or the file may be broadly broken, prefer restoring the last backup.
+- 先检查数据库版本、错误日志、配置校验结果和失败变更。
+- 优先进行能够恢复可用性的最小数据库参数回退。
+- 尽量只处理本次失败变更涉及的参数，不触碰无关配置。
+- 保持持久性、隔离级别和观测能力；不修改压测输入。
+- 证据不明确、多个参数冲突或配置文件整体不可靠时，优先恢复上次备份。
+- 不提出 shell 命令或其他参数层级的调整。
+- 只返回一个 JSON 对象，具体执行与验证由程序完成。
 
-## Repair policy
+## 修复顺序
 
-1. Read the restart diagnostics and validation output first.
-2. If an error clearly points to one knob or one invalid value, revert only that knob to its previous stable value.
-3. If multiple changed knobs are suspect and diagnostics are ambiguous, revert the whole failed candidate.
-4. If syntax or include-file errors suggest the file is broadly unsafe, return `restore_backup`.
-5. Never modify benchmark parameters or unrelated OS settings.
-6. Return exactly one JSON object.
+1. 错误明确指向单个参数时，建议恢复其已验证旧值。
+2. 多个变更都可能有问题时，建议回退整个失败候选。
+3. 配置语法或包含文件异常时，返回 `restore_backup`。
+4. 服务未恢复且验证未通过时，不宣称修复成功，不继续正常调优。
 
-## Output schema
+## 输出结构
+
+`action_type` 只能从 `db_config` 与 `restore_backup` 中选择一个。恢复备份时 `candidate_config` 为空。
 
 ```json
 {
-  "diagnosis": "string",
-  "action_type": "db_config | restore_backup",
-  "candidate_config": {
-    "key": "value"
-  },
+  "diagnosis": "错误证据与修复依据",
+  "action_type": "restore_backup",
+  "candidate_config": {},
   "restart_required": true,
-  "expected_effect": "string",
-  "risk": "string",
+  "expected_effect": "恢复已验证配置和服务可用性",
+  "risk": "尚未确认的条件或需要人工处理的事项",
   "validation_required": true
 }
 ```

@@ -41,7 +41,7 @@ def write_state_snapshot(
     snapshot_path = snapshot_dir / f"round_{round_id:03d}_{phase}.txt"
 
     lines = [
-        "# AgenticDB State Snapshot",
+        "# AgenticDB 状态快照",
         "",
         f"captured_at\t{datetime.now().isoformat(timespec='seconds')}",
         f"round_id\t{round_id}",
@@ -65,11 +65,11 @@ def write_state_snapshot(
             "metrics_profile": len(metric_profile),
             "prompt_innodb_metrics": len(prompt_innodb_metrics),
         }
-        _write_mapping(lines, "Candidate Knob Values", current_config)
-        _write_mapping(lines, "Prompt MySQL Status Metrics", status)
-        _write_mapping(lines, "Prompt MySQL Variable Metrics", variables)
-        _write_list(lines, "Prompt InnoDB Metric Profile", list(metric_profile))
-        _write_mapping(lines, "Prompt InnoDB Metrics (Whitelist)", prompt_innodb_metrics)
+        _write_mapping(lines, "候选参数当前值", current_config)
+        _write_mapping(lines, "提示上下文中的 MySQL 状态指标", status)
+        _write_mapping(lines, "提示上下文中的 MySQL 变量指标", variables)
+        _write_list(lines, "提示上下文中的 InnoDB 指标目录", list(metric_profile))
+        _write_mapping(lines, "提示上下文中的 InnoDB 白名单指标", prompt_innodb_metrics)
     else:
         settings = db_metrics.get("settings", {}) or current_config
         stat_metrics = db_metrics.get("stat_metrics", {}) or {}
@@ -80,19 +80,19 @@ def write_state_snapshot(
             "metrics_profile": len(metric_profile),
             "stat_metrics": len(stat_metrics),
         }
-        _write_mapping(lines, "PostgreSQL Settings", settings)
-        _write_list(lines, "PostgreSQL Metric Profile", list(metric_profile))
-        _write_mapping(lines, "PostgreSQL Stat Metrics", stat_metrics)
+        _write_mapping(lines, "PostgreSQL 参数", settings)
+        _write_list(lines, "PostgreSQL 指标目录", list(metric_profile))
+        _write_mapping(lines, "PostgreSQL 状态指标", stat_metrics)
 
-    lines.append("## OS Metrics")
+    lines.append("## 系统只读诊断")
     lines.append("")
     lines.append(json.dumps(os_metrics, ensure_ascii=False, indent=2, sort_keys=True))
     lines.append("")
-    lines.append("## DB Runtime")
+    lines.append("## 数据库运行环境")
     lines.append("")
     lines.append(json.dumps(db_runtime, ensure_ascii=False, indent=2, sort_keys=True))
     lines.append("")
-    lines.append("## Prompt DB Metrics Summary")
+    lines.append("## 提示上下文中的数据库指标摘要")
     lines.append("")
     lines.append(json.dumps(db_metrics, ensure_ascii=False, indent=2, sort_keys=True))
     lines.append("")

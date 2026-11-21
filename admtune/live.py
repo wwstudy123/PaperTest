@@ -120,7 +120,6 @@ def main() -> int:
         benchmark_path=args.benchmark.resolve(), knobs_path=args.knobs.resolve(),
         dry_run_override=False,
     )
-    app.auditor.dbms_only = True
     space = load_space(args.knobs, memory_bytes=app.target.hardware_memory_bytes)
     extra = (yaml.safe_load(args.target.read_text()) or {}).get("admtune", {})
     if args.command != "preflight" and any(

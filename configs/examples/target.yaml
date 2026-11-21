@@ -28,7 +28,6 @@ safety:
   auto_repair_on_restart_failure: false
   max_repair_attempts: 0
 auditor:
-  dbms_only: true
   initial_phase: db
 admtune:
   # Replace these IDs with the actual dedicated instance and initial data snapshot.

@@ -95,10 +95,6 @@ def _build_fake_state(config_path: str, dbms: str) -> dict[str, Any]:
                 "pg_stat_io.sum.reads": 11000,
                 "pg_stat_io.sum.writes": 7000,
             },
-            "sysctl": {
-                "vm.swappiness": "10",
-                "vm.dirty_ratio": "20",
-            },
             "service_running": True,
             "service_last_error": "",
             "benchmark_counter": 0,
@@ -132,10 +128,6 @@ def _build_fake_state(config_path: str, dbms: str) -> dict[str, Any]:
             "log_write_requests": 420000,
             "dml_reads": 880000,
             "dml_updates": 120000,
-        },
-        "sysctl": {
-            "vm.swappiness": "10",
-            "vm.dirty_ratio": "20",
         },
         "service_running": True,
         "service_last_error": "",
@@ -494,18 +486,6 @@ class SSHConnector:
             stdout = "1.20 0.95 0.85 1/345 12345\n"
         elif "uptime -p" in cmd or cmd == "uptime":
             stdout = "up 3 days, 4 hours\n"
-        elif cmd.startswith("sysctl -n "):
-            key = cmd.split("sysctl -n ", 1)[1].strip()
-            stdout = f"{self._fake_state['sysctl'].get(key, '0')}\n"
-        elif "sysctl -w" in cmd:
-            expression = cmd.split("sysctl -w", 1)[1].strip()
-            if "=" in expression:
-                key, value = expression.split("=", 1)
-                self._fake_state["sysctl"][key.strip()] = value.strip()
-                stdout = f"{key.strip()} = {value.strip()}\n"
-            else:
-                exit_code = 1
-                stderr = "invalid sysctl expression\n"
         elif "systemctl restart" in cmd:
             validation_error = self._validate_fake_config()
             if validation_error:

@@ -389,23 +389,8 @@ class LLMClient:
         memory_bytes = int(context.get("hardware_memory_bytes", 0))
         current_phase = str(context.get("current_phase", "db")).lower()
 
-        if current_phase in {"os", "os_sysctl"}:
-            return self._heuristic_os_proposal(context.get("os_metrics", {}) or {}, history)
-        if current_phase == "os_control":
-            return LLMProposal(
-                diagnosis="DB and sysctl tuning have plateaued; no safe heuristic OS control change is available without live control-state evidence.",
-                action_type="repeat_benchmark",
-                candidate_config={},
-                restart_required=False,
-                expected_effect="Confirm the current best result before trying stronger OS controls.",
-                risk="Consumes one tuning round without changing configuration.",
-                validation_required=False,
-                auditor_recommendation={
-                    "next_phase": "stop",
-                    "reason": "Heuristic fallback does not choose THP/CPU/block controls without explicit live evidence.",
-                    "confidence": "medium",
-                },
-            )
+        if current_phase != "db":
+            raise ValueError("只支持数据库调优阶段 db")
 
         if history and history[-1].get("decision") == "rollback":
             return LLMProposal(
@@ -450,18 +435,6 @@ class LLMClient:
                 validation_required=True,
             )
 
-        flush_commit = int(current_config.get("innodb_flush_log_at_trx_commit", 1))
-        if flush_commit == 1:
-            return LLMProposal(
-                diagnosis="Strict flush-on-commit may be limiting throughput in the current workload.",
-                action_type="db_config",
-                candidate_config={"innodb_flush_log_at_trx_commit": 2},
-                restart_required=False,
-                expected_effect="Reduce commit path sync pressure and improve throughput.",
-                risk="Can weaken durability guarantees during a crash window.",
-                validation_required=True,
-            )
-
         if io_capacity_max < 25000:
             return LLMProposal(
                 diagnosis="The workload may still benefit from a wider flush burst ceiling.",
@@ -483,73 +456,6 @@ class LLMClient:
             validation_required=False,
         )
 
-    def _heuristic_os_proposal(self, os_metrics: dict[str, Any], history: list[dict[str, Any]]) -> LLMProposal:
-        sysctl = os_metrics.get("sysctl", {}) or {}
-        recently_failed_keys: set[str] = set()
-        for entry in history[-3:]:
-            proposal = entry.get("proposal", {}) or {}
-            metadata = entry.get("metadata", {}) or {}
-            if entry.get("decision") == "rollback" and (
-                proposal.get("action_type") == "os_config" or metadata.get("phase") in {"os", "os_sysctl"}
-            ):
-                recently_failed_keys.update((proposal.get("candidate_config") or {}).keys())
-
-        def int_value(key: str, default: int) -> int:
-            try:
-                return int(str(sysctl.get(key, default)).strip())
-            except ValueError:
-                return default
-
-        dirty_ratio = int_value("vm.dirty_ratio", 20)
-        dirty_background_ratio = int_value("vm.dirty_background_ratio", 10)
-        dirty_keys = {"vm.dirty_background_ratio", "vm.dirty_ratio"}
-        if (dirty_ratio > 15 or dirty_background_ratio > 5) and not dirty_keys.issubset(recently_failed_keys):
-            return LLMProposal(
-                diagnosis="DB tuning has plateaued, and kernel dirty page thresholds still look generic for a write-heavy database host.",
-                action_type="os_config",
-                candidate_config={
-                    "vm.dirty_background_ratio": 5,
-                    "vm.dirty_ratio": 15,
-                },
-                restart_required=False,
-                expected_effect="Start background writeback earlier and reduce foreground write stalls.",
-                risk="More frequent background writeback can increase steady-state IO pressure.",
-                validation_required=True,
-            )
-
-        swappiness = int_value("vm.swappiness", 10)
-        if swappiness > 1 and "vm.swappiness" not in recently_failed_keys:
-            return LLMProposal(
-                diagnosis="DB tuning has plateaued, and the host has enough RAM, so swap preference can be reduced.",
-                action_type="os_config",
-                candidate_config={"vm.swappiness": 1},
-                restart_required=False,
-                expected_effect="Reduce latency spikes from avoidable swapping under memory pressure.",
-                risk="If memory pressure becomes extreme, the kernel has less room to swap anonymous pages.",
-                validation_required=True,
-            )
-
-        numa_balancing = int_value("kernel.numa_balancing", 1)
-        if numa_balancing != 0 and "kernel.numa_balancing" not in recently_failed_keys:
-            return LLMProposal(
-                diagnosis="DB tuning has plateaued; automatic NUMA balancing may add latency variance on a dedicated DB host.",
-                action_type="os_config",
-                candidate_config={"kernel.numa_balancing": 0},
-                restart_required=False,
-                expected_effect="Reduce background page migration overhead and latency variance.",
-                risk="Can be neutral or harmful if the workload benefits from automatic NUMA placement.",
-                validation_required=True,
-            )
-
-        return LLMProposal(
-            diagnosis="The OS-level settings already look close to the conservative database-host targets.",
-            action_type="repeat_benchmark",
-            candidate_config={},
-            restart_required=False,
-            expected_effect="Confirm whether the apparent plateau is just benchmark noise.",
-            risk="Consumes one tuning round without changing configuration.",
-            validation_required=False,
-        )
 
     def _heuristic_postgres_proposal(
         self,

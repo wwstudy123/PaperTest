@@ -1,16 +1,20 @@
-# ADMTune on AgenticDB
+# ADMTune 数据库参数调优实验
 
-ADMTune is being developed incrementally on the AgenticDB execution artifact.
-The upstream source and MIT license are retained. **No real database results
-or LLM performance claims have been produced by this fork yet.**
+本项目基于 AgenticDB 的数据库执行代码，逐步实现动态负载分析、多角色候选生成、代理模型调度和增量反思。保留上游 MIT 许可证与来源记录。
 
-The implementation plan and safety boundaries are in
-[`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md).
-Deployment credentials belong in ignored `configs/local/` or environment
-variables, never in committed examples. Generated runs and database backups
-are ignored by Git.
+**当前尚未产生真实数据库性能结论。模拟运行结果只用于验证代码链路，不能写成论文实验结果。**
 
-## Safe offline start
+## 功能边界
+
+- 仅调整数据库参数，操作系统参数调优代码已删除，不再提供启用开关。
+- 保留 CPU、内存、磁盘和 I/O 的只读诊断；这些信息不会形成系统参数修改动作。
+- 大语言模型按参数选择、范围裁剪、候选推荐和反思任务调用，不训练或微调模型权重。
+- 高斯过程使用实测性能的对数目标；阶段基准用于收益比较，不重新定义历史标签。
+- 真实试验只能在专用测试实例上执行；配置应用、实际回读和恢复验证由程序负责。
+
+## 安装与离线检查
+
+需要 Python 3.10 或更新版本：
 
 ```sh
 python3 -m venv .venv
@@ -19,22 +23,23 @@ python3 -m venv .venv
 .venv/bin/python -m admtune.cli --simulate --scenario aba --seed 0 --trials 24
 ```
 
-This is a **synthetic simulation with a heuristic proposer**, not a MySQL
-experiment and not an LLM evaluation. No API key, GPU or live DB is needed.
-See [`docs/OFFLINE.md`](docs/OFFLINE.md) for variants and numerical contracts.
+上述命令不连接数据库，也不调用模型接口，不需要 GPU。候选由可复现的启发式测试替身生成，性能值来自人工构造的函数，而非 MySQL。
 
-## Dedicated MySQL execution gate
+详细说明见[离线验证文档](docs/OFFLINE.md)。
 
-[`docs/LIVE_RUNBOOK.md`](docs/LIVE_RUNBOOK.md) documents the explicit
-`admtune.live preflight`, `pilot`, and `tune-static` commands, ignored local
-configuration files and opt-in paid LLM calls. Real measurements require
-`--dedicated-instance`; service restarts require an additional permission.
-Real dynamic replay and OLAP are not yet claimed as implemented or validated.
+## 真实 MySQL 实验入口
 
-**The inherited `agenticdb` command below is upstream reference, not the
-ADMTune entry point.** Use `--dbms-only` when evaluating its restricted baseline.
+先按[实机运行手册](docs/LIVE_RUNBOOK.md)准备本地配置，再依次进行：
 
-## Reproducible synthetic ablation matrix
+1. `admtune.live preflight`：预检，不应用配置、不重启、不压测、不调用模型。
+2. `admtune.live pilot`：不用模型，验证手工小改动、测量和恢复。
+3. `admtune.live tune-static`：通过前两步后再开展小预算静态搜索。
+
+真实试验必须显式传入 `--dedicated-instance`。数据库服务重启需要额外的 `--allow-restart`。付费模型调用还需要 `--backend llm --allow-paid-llm` 和明确的调用、令牌预算。
+
+真实动态请求采集与回放、完整 OLAP 执行、正式基线对照仍待后续集成，不应将离线测试视为已完成这些实验。
+
+## 合成消融矩阵
 
 ```sh
 .venv/bin/python -m admtune.experiments --simulate \
@@ -42,83 +47,44 @@ ADMTune entry point.** Use `--dbms-only` when evaluating its restricted baseline
   --output runs/aba-suite-001
 ```
 
-This runs seven variants with three seeds and writes ignored JSON/CSV audit
-reports. It never launches a live experiment or calls an API.
-See [`docs/STATUS.md`](docs/STATUS.md) for completed and pending gates.
+运行七个变体、三个随机种子，生成 JSON 和 CSV 审计文件。命令不会隐式启动真实试验或模型调用。`static` 可替换 `aba`，用于静态场景检查。
 
-## Upstream AgenticDB reference
-
-Core implementation for the AgenticDB paper.
-
-## Contents
+## 代码目录
 
 ```text
-main.py, loop.py       Main entry point and control loop
-auditor.py             Acceptance, rollback, and phase decisions
-config.py              Configuration models and loading
-connectors/            MySQL, PostgreSQL, and SSH connectors
-memory/                Same-task and cross-task experience memory
-profiles/              Workload and metric interpretation
-tools/                 Execution, metrics, recovery, and reporting
-validators/            Configuration, safety, and result validation
-skills/                Prompts loaded by the control loop
-LICENSE                MIT License
+admtune/       ADMTune 控制器、负载、代理模型、协作角色、反思与实验入口
+connectors/    数据库与 SSH 连接
+memory/        从 AgenticDB 继承的会话与经验管理
+tools/         数据库应用、恢复、压测、只读诊断与报告
+validators/    参数、运行结果和动作权限校验
+skills/        运行时读取的中文规划与数据库修复提示词
+configs/       可公开的配置示例；私有配置放在 configs/local/
+tests/        单元测试、模拟连接器测试及离线集成测试
+docs/         设计、状态与运行说明
 ```
 
-The main control flow is in `main.py` and `loop.py`.
-Supporting modules implement auditing, candidate selection, database
-connections, validation, rollback, metric collection, and experience memory.
-The Markdown files under `skills/` are prompts loaded by the code and
-are part of the implementation.
+## AgenticDB 裁剪版基线
 
-Generated experiment outputs are not stored in this source repository. Each
-execution creates a separate directory under `runs/` for its reports, CSV data,
-logs, prompts, messages, configuration backups, and state snapshots. The
-`runs/` directory is ignored by Git.
+保留的 `agenticdb` 命令及 `main.py`、`loop.py` 用于数据库层基线。当前分支已删除系统调优分支，达到数据库搜索平台期后直接停止，无需也不再接受 `--dbms-only` 参数。
 
-## Install
-
-Python 3.10 or newer is required.
-
-```bash
-pip install -e .
+```sh
+.venv/bin/python main.py --rounds 15 \
+  --config configs/local/target.yaml \
+  --benchmark-config configs/local/benchmark.yaml \
+  --knobs-config configs/local/knobs.yaml \
+  --dry-run --no-history --no-memory-book
 ```
 
-## Run
+这个裁剪版必须标记为 `AgenticDB-DBMS-only`，不能称为完整原版 AgenticDB。继承入口不等同于 ADMTune 实机入口的全部安全检查；实际试验优先按实机手册操作，不直接套用上游的真实运行命令。
 
-Prepare three environment-specific YAML files:
+## 文件与凭证管理
 
-- `target.yaml`: database and SSH connection settings;
-- `benchmark.yaml`: workload command, metrics, and objective;
-- `knobs.yaml`: tunable database knobs.
+凭证只写入被忽略的 `.env`，部署配置只放入被忽略的 `configs/local/`。`runs/`、数据、日志、配置备份和虚拟环境均不提交。不要将密码或模型密钥发到聊天、写入公开示例或加入 Git。
 
-After installation, run a dry-run session with:
+- [实施方案](docs/IMPLEMENTATION.md)
+- [当前状态与后续门槛](docs/STATUS.md)
+- [上游 AgenticDB](https://github.com/xinyueyangiscas/AgenticDB)
 
-```bash
-agenticdb --rounds 15 \
-  --config /path/to/target.yaml \
-  --benchmark-config /path/to/benchmark.yaml \
-  --knobs-config /path/to/knobs.yaml \
-  --dry-run
-```
+## 许可证
 
-The equivalent direct Python command is:
-
-```bash
-python main.py --rounds 15 \
-  --config /path/to/target.yaml \
-  --benchmark-config /path/to/benchmark.yaml \
-  --knobs-config /path/to/knobs.yaml \
-  --dry-run
-```
-
-For an environment-connected tuning session, replace `--dry-run` with
-`--real-run`. Use `--no-history` and `--no-memory-book` when a clean ablation
-run must not reuse earlier experience.
-
-The complete private server and benchmark deployment environment is not
-included.
-
-## License
-
-MIT License. See `LICENSE`.
+保留上游 MIT 许可证，原文见 `LICENSE`。许可证不是 Markdown 文档，不作翻译或改写。

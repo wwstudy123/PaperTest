@@ -46,7 +46,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-name", default=None, help="Optional run directory suffix")
     parser.add_argument("--dry-run", action="store_true", help="Force dry-run mode")
     parser.add_argument("--real-run", action="store_true", help="Force real remote execution")
-    parser.add_argument("--dbms-only", action="store_true", help="Disable all OS tuning actions and transitions")
     parser.add_argument(
         "--no-history",
         action="store_true",
@@ -93,9 +92,6 @@ def main() -> int:
         knobs_path=knobs_config_path,
         dry_run_override=dry_run_override,
     )
-    if args.dbms_only:
-        app_config.auditor.dbms_only = True
-        app_config.auditor.initial_phase = "db"
 
     run_dir = create_run_dir(app_config.runs_dir, args.run_name)
     logger = setup_logger(run_dir)

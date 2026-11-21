@@ -342,7 +342,7 @@ def infer_workload_intent(
                 "reason": (
                     "Read-only sysbench usually needs several DB-side checks "
                     "around cache, AHI, performance_schema, and thread concurrency "
-                    "before switching to OS layers."
+                    "before stopping database search."
                 ),
             },
             evidence=evidence,
@@ -373,7 +373,7 @@ def infer_workload_intent(
             ],
             first_round_guidance=[
                 "For pure benchmark maximum, benchmark_max durability tradeoffs are high leverage.",
-                "Prioritize redo/binlog, doublewrite, flush method, IO capacity, and write-related OS dirty controls.",
+                "Prioritize database IO capacity, caching and write-path bottlenecks while preserving durability and consistency.",
             ],
             knobs_to_prioritize=[
                 "innodb_flush_log_at_trx_commit",

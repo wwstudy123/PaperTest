@@ -301,11 +301,9 @@ def _compact_entry_for_prompt(entry: dict[str, Any]) -> dict[str, Any]:
         "baseline": entry.get("baseline"),
         "best_result": entry.get("best_result"),
         "improvement": entry.get("improvement"),
-        "successful_patterns": entry.get("successful_patterns", [])[:4],
-        "failed_patterns": entry.get("failed_patterns", [])[:3],
+        "successful_patterns": [p for p in entry.get("successful_patterns", []) if p.get("phase") in {None, "db"}][:4],
+        "failed_patterns": [p for p in entry.get("failed_patterns", []) if p.get("phase") in {None, "db"}][:3],
         "danger_zone": entry.get("danger_zone", [])[:5],
-        "best_os_config": entry.get("best_os_config") or {},
-        "best_os_controls": entry.get("best_os_controls") or {},
     }
 
 
@@ -365,6 +363,8 @@ class WorkloadMemoryBook:
         db_filter = _memory_file_dbms(dbms) if dbms is not None else None
         for path in self._known_paths(dbms):
             for payload in self._load_file(path):
+                if payload.get("final_phase") not in {None, "db", "stop"}:
+                    continue
                 if db_filter is not None and _memory_file_dbms(payload.get("dbms")) != db_filter:
                     continue
                 entry_id = str(payload.get("entry_id") or "")
@@ -465,22 +465,6 @@ class WorkloadMemoryBook:
         if new_success:
             reasons.append("new_successful_knob_pattern")
 
-        current_os_success = _pattern_key_set(
-            entry,
-            "successful_patterns",
-            phases={"os_sysctl", "os_control"},
-        )
-        existing_os_success: set[str] = set()
-        for other in similar:
-            existing_os_success |= _pattern_key_set(
-                other,
-                "successful_patterns",
-                phases={"os_sysctl", "os_control"},
-            )
-        new_os_success = current_os_success - existing_os_success
-        if new_os_success:
-            reasons.append("new_os_layer_signal")
-
         current_failures = _pattern_key_set(entry, "failed_patterns")
         existing_failures: set[str] = set()
         for other in similar:
@@ -514,7 +498,6 @@ class WorkloadMemoryBook:
             "best_existing_score": best_existing_score,
             "candidate_score": best_score,
             "new_success_keys": sorted(new_success)[:20],
-            "new_os_success_keys": sorted(new_os_success)[:20],
             "new_failure_keys": sorted(new_failures)[:20],
             "new_risk_keys": sorted(new_risks)[:20],
         }
@@ -527,6 +510,9 @@ class WorkloadMemoryBook:
         summary: dict[str, Any],
         rounds: list[dict[str, Any]],
     ) -> dict[str, Any]:
+        rounds = [entry for entry in rounds
+                  if (entry.get("metadata") or {}).get("phase", "db") == "db"
+                  and (entry.get("proposal") or {}).get("action_type") in {"db_config", "repeat_benchmark"}]
         best_result = _compact_result(summary.get("best_result"))
         baseline_result = _compact_result(summary.get("baseline"))
         if baseline_result is None:
@@ -569,8 +555,6 @@ class WorkloadMemoryBook:
             "failed_patterns": [_compact_trial(entry) for entry in failed[-6:]],
             "danger_zone": _risk_items(rounds),
             "best_config_keys": sorted((summary.get("best_config") or {}).keys()),
-            "best_os_config": summary.get("best_os_config") or {},
-            "best_os_controls": summary.get("best_os_controls") or {},
             "final_phase": summary.get("final_phase"),
             "stop_reason": summary.get("stop_reason"),
             "confidence": "high" if accepted and best_result else "medium",

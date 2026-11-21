@@ -12,14 +12,10 @@ from typing import Any
 
 from auditor import (
     DB_PHASE,
-    OS_CONTROL_PHASE,
-    OS_PHASE,
     STOP_PHASE,
     AuditDecision,
     TuningAuditor,
     allowed_actions_for_phase,
-    build_os_control_space,
-    build_os_knob_space,
 )
 from config import AppConfig, KnobSpec, MySQLSettings, PostgreSQLSettings
 from dbms_policy import enforce_dbms_only
@@ -32,22 +28,18 @@ from memory.workload_memory import WorkloadMemoryBook
 from models import BackupRecord, BenchmarkResult, LLMProposal, RepairOutcome
 from profiles.workload_intent import infer_workload_intent
 from tools.apply_db_config import apply_db_config
-from tools.apply_os_controls import apply_os_controls, rollback_os_controls
-from tools.apply_os_config import apply_os_config
 from tools.collect_db_metrics import collect_db_metrics
-from tools.collect_os_controls import collect_os_controls
 from tools.collect_os_metrics import collect_os_metrics
 from tools.collect_os_observability import collect_os_observability, collect_storage_context
 from tools.diagnose_db_failure import diagnose_db_failure
 from tools.generate_run_report import write_run_report
 from tools.read_db_config import discover_db_runtime, read_current_db_config
 from tools.restart_db import restart_db
-from tools.rollback import create_config_backup, rollback_db_config, rollback_os_config
+from tools.rollback import create_config_backup, rollback_db_config
 from tools.run_benchmark import run_benchmark
 from tools.state_snapshot import write_state_snapshot
 from utils.logging_utils import TraceLogger
 from validators.config_validator import ConfigValidator
-from validators.os_control_validator import OSControlValidator
 from validators.result_validator import ResultValidator
 from validators.safety_guard import SafetyGuard
 
@@ -166,8 +158,6 @@ def _compact_db_runtime_for_prompt(db_runtime: dict[str, Any]) -> dict[str, Any]
         "workload_interpretation",
         "hardware",
         "objective",
-        "os_parameter_count",
-        "os_control_count",
         "parameter_count",
         "selected_parameter_count",
         "knob_selection",
@@ -177,264 +167,42 @@ def _compact_db_runtime_for_prompt(db_runtime: dict[str, Any]) -> dict[str, Any]
 
 
 def build_prompt(
-    *,
-    skill_text: str,
-    dbms_only: bool = False,
-    os_metrics: dict[str, Any],
-    db_metrics: dict[str, Any],
-    current_config: dict[str, Any],
-    db_runtime: dict[str, Any],
-    profile_context: dict[str, Any],
-    knob_space: dict[str, Any],
-    os_knob_space: dict[str, Any],
-    os_control_space: dict[str, Any],
-    current_phase: str,
-    round_id: int,
-    audit_decision: AuditDecision,
-    baseline_result: BenchmarkResult,
-    best_result: BenchmarkResult,
-    history: list[dict[str, Any]],
-    tuning_history_summary: dict[str, Any],
-    workload_memory_summary: dict[str, Any],
+    *, skill_text: str, os_metrics: dict[str, Any], db_metrics: dict[str, Any],
+    current_config: dict[str, Any], db_runtime: dict[str, Any],
+    profile_context: dict[str, Any], knob_space: dict[str, Any], current_phase: str,
+    round_id: int, audit_decision: AuditDecision, baseline_result: BenchmarkResult,
+    best_result: BenchmarkResult, history: list[dict[str, Any]],
+    tuning_history_summary: dict[str, Any], workload_memory_summary: dict[str, Any],
 ) -> str:
-    include_reference_file_contents = round_id <= 1
-    compact_prompt = compact_prompt_enabled()
-    if compact_prompt:
-        render_profile_context = _compact_profile_context_for_llm(
-            profile_context,
-            include_reference_file_contents=include_reference_file_contents,
-        )
-        prompt_profile_context = _compact_profile_context_for_llm(
-            profile_context,
-            include_reference_file_contents=False,
-        )
-    else:
-        render_profile_context = prepare_profile_context_for_prompt(
-            profile_context,
-            include_reference_file_contents=include_reference_file_contents,
-        )
-        prompt_profile_context = render_profile_context
-    workload_interpretation = (
-        prompt_profile_context.get("workload_interpretation")
-        or (prompt_profile_context.get("benchmark", {}) or {}).get("workload_interpretation")
-        or {}
-    )
-    prompt_db_runtime = copy.deepcopy(db_runtime)
-    prompt_db_runtime["benchmark"] = prompt_profile_context.get("benchmark", {})
-    prompt_db_runtime["workload_interpretation"] = workload_interpretation
-    if "parameter_metadata" in prompt_db_runtime:
-        prompt_db_runtime.pop("parameter_metadata")
-        prompt_db_runtime["parameter_metadata_note"] = (
-            "Omitted here because allowed_knob_space already contains the live "
-            "current value, range, type, and restart metadata for every tunable knob."
-        )
-    if compact_prompt:
-        prompt_db_runtime = _compact_db_runtime_for_prompt(prompt_db_runtime)
-    task_brief = build_task_brief(
-        profile_context=prompt_profile_context,
-        db_runtime=prompt_db_runtime,
-        current_phase=current_phase,
-        round_id=round_id,
-        baseline_result=baseline_result,
-        best_result=best_result,
-    )
-    rendered_prompt = render_tuning_prompt_template(
-        skill_text,
-        task_brief=task_brief,
-        profile_context=render_profile_context,
-        current_phase=current_phase,
-        include_reference_file_contents=include_reference_file_contents,
-    )
-    prompt_knob_space = _compact_knob_space_for_prompt(knob_space) if compact_prompt else knob_space
-    prompt_os_knob_space = (
-        _compact_knob_space_for_prompt(os_knob_space)
-        if compact_prompt and current_phase == OS_PHASE
-        else (os_knob_space if not compact_prompt else {})
-    )
-    prompt_os_control_space = (
-        _compact_knob_space_for_prompt(os_control_space)
-        if compact_prompt and current_phase == OS_CONTROL_PHASE
-        else (os_control_space if not compact_prompt else {})
-    )
+    if current_phase != DB_PHASE:
+        raise ValueError("规划器只支持数据库参数调优")
+    profile = _compact_profile_context_for_llm(profile_context, include_reference_file_contents=round_id <= 1)
+    runtime = _compact_db_runtime_for_prompt(copy.deepcopy(db_runtime))
+    brief = build_task_brief(profile_context=profile, db_runtime=runtime, current_phase=current_phase,
+                             round_id=round_id, baseline_result=baseline_result, best_result=best_result)
+    rendered = render_tuning_prompt_template(skill_text, task_brief=brief, profile_context=profile,
+                    current_phase=current_phase, include_reference_file_contents=round_id <= 1)
+    safe_space = {}
+    for name, spec in knob_space.items():
+        try:
+            enforce_dbms_only("db_config", {name: current_config.get(name)})
+        except ValueError:
+            continue
+        safe_space[name] = spec
     payload = {
-        "prompt_compaction": {
-            "enabled": compact_prompt,
-            "policy": (
-                "Compact mode preserves the executable candidate space but removes duplicate "
-                "file copies and redundant current_config data. allowed_knob_space remains "
-                "the source of truth for DB knob names, live values, ranges, enum values, "
-                "restart requirements, and whether a knob may be persisted into the DB "
-                "startup/config file."
-            ),
-        },
-        "task_brief": task_brief,
-        "task_round_id": round_id,
-        "target_profile": prompt_profile_context,
-        "current_phase": current_phase,
-        "allowed_action_types": sorted(allowed_actions_for_phase(current_phase, dbms_only=dbms_only)),
-        "auditor_state": audit_decision.to_dict(),
-        "os_metrics": os_metrics,
-        "db_metrics": db_metrics,
-        "allowed_knob_count": len(knob_space),
-        "allowed_os_knob_count": len(os_knob_space),
-        "allowed_os_control_count": len(os_control_space),
-        "current_config_note": (
-            "Omitted from compact prompt because allowed_knob_space contains current_value for every DB knob."
-            if compact_prompt
-            else None
-        ),
-        "workload_interpretation": workload_interpretation,
-        "workload_direction_contract": (
-            "Before choosing knobs, follow workload_interpretation. It is a deterministic "
-            "preflight classification from the benchmark config, script, and command preview. "
-            "Use layered tags workload_class, base_type, access_patterns, "
-            "bottleneck_signals, and objective_tags before relying on a simple workload name. "
-            "Use primary_tuning_directions and knobs_to_prioritize as the main search lanes; "
-            "treat knobs_to_deprioritize as low priority unless live state metrics contradict "
-            "the classification. If workload_type is sysbench_oltp_read_only, do not spend "
-            "early DB rounds on redo/binlog/flush durability unless writes are actually visible."
-        ),
-        "os_config_contract": (
-            "When current_phase=os_sysctl, candidate_config may only contain keys from "
-            "allowed_os_knob_space with available=true. os_metrics is state context, "
-            "not permission to invent additional OS knobs. AgenticDB validates OS "
-            "sysctl proposals against this configured whitelist before applying."
-        ),
-        "os_control_contract": (
-            "When current_phase=os_control, action_type must be os_control and "
-            "candidate_config may only contain keys from allowed_os_control_space "
-            "with available=true. This layer covers non-sysctl controls such as "
-            "THP, CPU governor, and block queue sysfs controls. Block queue controls "
-            "with target_scope=db_data_device are scoped to os_metrics.storage.data_block_devices "
-            "only, so do not tune unrelated disks. This layer is stronger and riskier "
-            "than os_sysctl, so use it only after DB and sysctl layers plateau."
-        ),
-        "candidate_config_contract": (
-            "Round 1 when current_phase=db: candidate_config itself must be a "
-            "complete executable global configuration attempt, not a tiny one- or "
-            "two-knob probe. First form a full global better-configuration plan "
-            "over allowed_knob_space, record it in global_config_plan, and put the "
-            "whole first global candidate into candidate_config. It should normally "
-            "touch multiple DB subsystems relevant to workload_interpretation. For "
-            "read-only workloads this usually means memory/buffer pool, read-path "
-            "contention, performance_schema, AHI, thread/cache, and read-ahead knobs; "
-            "redo-binlog durability may be explicitly kept unchanged or treated as "
-            "low priority. For readwrite/write workloads it should usually cover "
-            "memory/buffer pool, redo-binlog durability, IO/flush, and concurrency/cache "
-            "knobs. For a benchmark_max objective, prefer a bold global candidate; "
-            "if fewer than 8 DB knobs are changed in round 1, explain in diagnosis "
-            "why a global multi-knob attempt is unsafe or impossible. "
-            "If benchmark_max restart-required knobs are present and the workload_interpretation "
-            "says they are high leverage, you may propose them with restart_required=true; "
-            "AgenticDB will persist them through the configured DB apply path, restart "
-            "the service when needed, run warmup, and then measure. "
-            "For MySQL TPCH / execution_time workloads, the first effective DB attempt "
-            "is executed as a dynamic-safe fast path: prioritize SET GLOBAL-capable "
-            "memory, temp-table, sort/join/read buffers, optimizer, read-ahead, and "
-            "read-path knobs first. Put restart-required ideas in global_config_plan "
-            "or more_aggressive_plan for later; do not put connectivity/control-plane "
-            "knobs such as skip_name_resolve into candidate_config. "
-            "Knobs marked persistable=false are runtime-only: you may propose them only "
-            "as online SET/reload candidates, not as required startup/static config changes. "
-            "Later rounds: keep the conversation context and propose the next "
-            "global-configuration improvement attempt; later rounds may be smaller "
-            "split tests when refining or isolating a previously successful global "
-            "candidate."
-        ),
-        "legacy_candidate_config_contract_note": (
-            "Older prompts said round 1 should always touch redo/binlog/durability. "
-            "The workload_interpretation now overrides that: do not force write-path "
-            "knobs into pure read workloads."
-        ),
-        "strategy_signal_contract": {
-            "exploration_mode": (
-                "Required. One of conservative, normal, aggressive, benchmark_max. "
-                "Use aggressive/benchmark_max when you deliberately choose a bolder "
-                "configuration search direction."
-            ),
-            "next_step": (
-                "Required. Write the short instruction you want the next tuning "
-                "conversation to inherit if this round succeeds or is close."
-            ),
-            "if_failed_next": (
-                "Required. Write the concrete next action if this candidate regresses, "
-                "including which direction or knobs should be avoided."
-            ),
-            "more_aggressive_plan": (
-                "Required object. Include a concise rationale and, when useful, an "
-                "aggressive_candidate_config that stays inside the allowed knob space. "
-                "This is advisory memory for the next round; candidate_config remains "
-                "the only config applied in the current round."
-            ),
-            "auditor_recommendation": (
-                "Required object. Recommend whether the auditor should keep tuning DB, "
-                "switch to OS sysctl, switch to OS control, or stop after this round is measured. "
-                "Use next_phase=db when DB-side global parameters still have promising attempts; "
-                "do not recommend os_sysctl just because one or two DB attempts regressed or "
-                "because a repeat_benchmark was needed. Use next_phase=os_sysctl only after "
-                "multiple DB global-parameter combinations have been validated and no concrete "
-                "DB candidate remains in next_step or more_aggressive_plan; use next_phase=os_control when sysctl "
-                "tuning also appears capped and THP/CPU/block controls should be tried; use "
-                "next_phase=stop only after OS control tuning is also exhausted. Include reason "
-                "and confidence."
-            ),
-        },
-        "benchmark_max_policy": {
-            "enabled": True,
-            "intent": (
-                "Pure benchmark maximum is allowed unless the user explicitly asks for "
-                "production-safe durability. Always state crash-safety risks."
-            ),
-            "workload_caveat": (
-                "Use benchmark_max tradeoffs only when they are present in allowed_knob_space "
-                "and justified by workload_interpretation, state metrics, and history. "
-                "Do not change benchmark-chain settings such as socket transport, report "
-                "interval, or sysbench client flags as tuning actions."
-            ),
-            "execution": "startup-only candidates require restart_required=true and are verified by warmup + measured benchmark.",
-        },
-        "allowed_knob_space": prompt_knob_space,
-        "allowed_os_knob_space": prompt_os_knob_space,
-        "allowed_os_control_space": prompt_os_control_space,
-        "db_runtime": prompt_db_runtime,
-        "objective": prompt_db_runtime.get("objective"),
-        "baseline_result": baseline_result.compact_dict(),
-        "best_result": best_result.compact_dict(),
-        "recent_history": history,
-        "tuning_history_summary": tuning_history_summary,
-        "workload_memory_book": workload_memory_summary,
+        "task_round_id": round_id, "target_profile": profile, "db_runtime": runtime,
+        "current_phase": DB_PHASE, "allowed_action_types": sorted(allowed_actions_for_phase(DB_PHASE)),
+        "auditor_state": audit_decision.to_dict(), "system_diagnostics": os_metrics,
+        "db_metrics": db_metrics, "allowed_knob_space": _compact_knob_space_for_prompt(safe_space),
+        "allowed_knob_count": len(safe_space), "current_config": current_config,
+        "objective": db_runtime.get("objective"), "baseline_result": baseline_result.compact_dict(),
+        "best_result": best_result.compact_dict(), "recent_history": history,
+        "tuning_history_summary": tuning_history_summary, "workload_memory_book": workload_memory_summary,
+        "candidate_config_contract": "只允许白名单内的数据库参数；不得修改持久性、隔离级别、观测能力和压测协议。",
+        "auditor_contract": "next_phase 只能为 db 或 stop。系统诊断仅供瓶颈分析。",
     }
-    if dbms_only:
-        rendered_prompt = (
-            "You are the AgenticDB-DBMS-only database planner. Propose one db_config "
-            "or repeat_benchmark action in the existing schema. OS writes and OS phase "
-            "transitions are forbidden. Preserve durability, consistency and observability. "
-            "Return a candidate_config within the supplied database knob space, diagnosis, "
-            "restart_required, expected_effect, risk, validation_required, and an "
-            "auditor_recommendation with next_phase=db or stop."
-        )
-        for key in (
-            "os_config_contract", "os_control_contract", "legacy_candidate_config_contract_note",
-            "allowed_os_knob_space", "allowed_os_control_space",
-        ):
-            payload.pop(key, None)
-        payload["allowed_os_knob_count"] = 0
-        payload["allowed_os_control_count"] = 0
-        payload["benchmark_max_policy"] = {"enabled": False}
-        payload["candidate_config_contract"] = (
-            "Propose database knobs only. Do not change durability, consistency, "
-            "instrumentation, benchmark client settings, or the optimization objective."
-        )
-        payload["strategy_signal_contract"]["auditor_recommendation"] = (
-            "Recommend next_phase=db or stop only; OS actions are not permitted."
-        )
-    if not compact_prompt:
-        payload["current_config"] = current_config
-    return (
-        f"{rendered_prompt}\n\n"
-        "Use the following runtime context and return exactly one JSON object.\n\n"
-        f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
-    )
+    return rendered + "\n\n请依据以下上下文输出一个 JSON 对象：\n" + json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+
 
 
 def build_repair_prompt(
@@ -767,8 +535,8 @@ def format_reference_files_for_prompt(
         if not include_contents:
             sections.append(
                 f"- {role}: `{path}` "
-                "(The complete file contents were provided in round 1; this round only "
-                "references the path and continues tuning using the new state/history.)"
+                "(首轮已提供完整文件；本轮仅引用路径，"
+                "结合新增状态与历史继续调优。)"
             )
             continue
         content = item.get("content")
@@ -779,7 +547,7 @@ def format_reference_files_for_prompt(
             f"### {role}: {path}\n"
             f"```{language}\n{content}\n```"
         )
-    return "\n\n".join(sections) if sections else "[no benchmark files provided]"
+    return "\n\n".join(sections) if sections else "[未提供压测参考文件]"
 
 
 def build_effective_benchmark_command_preview(app_config: AppConfig) -> str:
@@ -848,35 +616,20 @@ def _is_execution_time_objective(objective: dict[str, Any]) -> bool:
 
 
 def _format_result_for_brief(result: BenchmarkResult, objective: dict[str, Any]) -> str:
-    if _is_execution_time_objective(objective):
-        value = result.primary_metric_value
-        return "execution_time=unknown" if value is None else f"execution_time={value:.0f} ms"
-    tps = "unknown" if result.tps is None else f"{result.tps:.2f}"
-    p95 = "unknown" if result.p95_latency_ms is None else f"{result.p95_latency_ms:.2f}"
-    return f"{tps}/{p95} (tps/p95={result.score:.4f})"
+    metric = result.primary_metric_name or str(objective.get("primary_metric", "score"))
+    return f"{metric}={result.primary_metric_value}，目标得分={result.score:.6f}"
+
 
 
 def _objective_goal_text(objective: dict[str, Any]) -> tuple[str, str, str]:
-    if _is_execution_time_objective(objective):
-        return (
-            "reduce the execution_time (time_ms) recorded during the complete benchmark execute phase",
-            "a lower execution_time (time_ms)",
-            "TPS and p95 may only be used as observational information; they are not optimization "
-            "objectives for this task and cannot be used as the basis for accepting a configuration",
-        )
-    primary_metric = str(objective.get("primary_metric", "tps"))
-    direction = str(objective.get("direction", "maximize")).lower()
-    if direction == "minimize":
-        return (
-            f"reduce {primary_metric}",
-            f"a lower {primary_metric}",
-            f"A decrease in {primary_metric} must be used as the basis for judging configuration quality",
-        )
-    return (
-        "increase its tps/p95",
-        "a higher tps/p95",
-        "An increase in tps/p95 must be used as the basis for judging configuration quality",
-    )
+    formula = str(objective.get("formula", "")).lower().strip()
+    metric = str(objective.get("primary_metric", "tps"))
+    if formula in {"tps_over_p95", "throughput_over_p95", "tps / p95_latency"}:
+        return "提高 TPS/P95", "更高的 TPS/P95", "仅按配置声明的 TPS/P95 目标判断收益"
+    if str(objective.get("direction", "maximize")).lower() == "minimize":
+        return f"降低 {metric}", f"更低的 {metric}", "完整测量的主指标下降才表示改善，不得更换优化目标"
+    return f"提高 {metric}", f"更高的 {metric}", "仅按当前配置声明的主指标判断收益，其他指标作为独立约束或诊断"
+
 
 
 def render_tuning_prompt_template(
@@ -931,79 +684,28 @@ def _infer_workload_label(benchmark: dict[str, Any], fallback: str) -> str:
     return fallback.replace("_", " ")
 
 
-def build_task_brief(
-    *,
-    profile_context: dict[str, Any],
-    db_runtime: dict[str, Any],
-    current_phase: str,
-    round_id: int,
-    baseline_result: BenchmarkResult,
-    best_result: BenchmarkResult,
-) -> str:
-    benchmark = profile_context.get("benchmark", {}) or {}
-    workload_interpretation = (
-        profile_context.get("workload_interpretation")
-        or benchmark.get("workload_interpretation")
-        or {}
-    )
-    hardware = profile_context.get("hardware", {}) or {}
-    workload_label = _infer_workload_label(
-        benchmark,
-        str(profile_context.get("workload", "unknown")),
-    )
-    dbms = str(db_runtime.get("dbms", "unknown"))
-    db_version = str(db_runtime.get("db_version", "unknown"))
-    objective = (
-        profile_context.get("objective")
-        or benchmark.get("objective")
-        or {
-            "primary_metric": profile_context.get("primary_metric"),
-            "direction": profile_context.get("direction"),
-            "formula": profile_context.get("objective_formula"),
-        }
-    )
-    goal_text, improvement_text, decision_rule = _objective_goal_text(objective)
-    directions = ", ".join(workload_interpretation.get("primary_tuning_directions", [])[:6]) or "state-driven DB tuning"
-    low_priority = ", ".join(workload_interpretation.get("low_priority_directions", [])[:4]) or "none"
-    if round_id <= 1:
-        return (
-            f"You are an experienced DBA. You will adjust the global parameters for the current workload "
-            f"to {goal_text}. For the current server, you are tuning {workload_label} parameters for "
-            f"{dbms} {db_version} on a machine with CPU: {hardware.get('cpu', 'unknown')}, "
-            f"memory: {hardware.get('memory', 'unknown')}, and disk: {hardware.get('disk', 'unknown')}. "
-            f"The current workload has been preliminarily identified as "
-            f"{workload_interpretation.get('workload_type', workload_label)}. The primary tuning "
-            f"directions are: {directions}; the low-priority directions are: {low_priority}. "
-            "Here are the complete benchmark script and the current initial parameters. "
-            f"The initial benchmark result is {_format_result_for_brief(baseline_result, objective)}. "
-            f"{decision_rule}. "
-            "First, you need to produce a globally better configuration plan for the server based on the "
-            "complete candidate global parameter space, rather than selecting only a small number of knobs "
-            "in isolation. You can also adjust the configuration by observing the current server's "
-            f"state_metric and obtain {improvement_text} after a small number of attempts. "
-            "The candidate_config for the first round must also be an executable global candidate "
-            "configuration, rather than changing only one or two parameters. It should cover the primary "
-            "directions identified by workload_interpretation. For a read-only or analytical workload, do "
-            "not force redo/binlog/flush into the configuration as core sources of benefit merely to make "
-            "the plan global. For a pure benchmark limit objective, you may use a more aggressive "
-            "benchmark_max global combination and clearly state the risks. Write this global plan to "
-            "global_config_plan, and write the same set of global parameter changes to be applied and "
-            "validated in the first round to candidate_config."
-        )
-
+def build_task_brief(*, profile_context: dict[str, Any], db_runtime: dict[str, Any],
+                     current_phase: str, round_id: int, baseline_result: BenchmarkResult,
+                     best_result: BenchmarkResult) -> str:
+    benchmark = profile_context.get("benchmark") or {}
+    objective = benchmark.get("objective") or {
+        "primary_metric": profile_context.get("primary_metric"),
+        "direction": profile_context.get("direction"),
+        "formula": profile_context.get("objective_formula"),
+    }
+    goal, improvement, rule = _objective_goal_text(objective)
+    workload = _infer_workload_label(benchmark, str(profile_context.get("workload", "未知")))
     return (
-        f"You are an experienced DBA. You will continue adjusting the parameters for the current workload "
-        f"to {goal_text}. You are continuing to tune global parameters for {workload_label} on "
-        f"{dbms} {db_version}. The current workload has been preliminarily identified as "
-        f"{workload_interpretation.get('workload_type', workload_label)}. The primary tuning directions "
-        f"are: {directions}; the low-priority directions are: {low_priority}. The initial benchmark result "
-        f"is {_format_result_for_brief(baseline_result, objective)}, and the best result achieved so far is "
-        f"{_format_result_for_brief(best_result, objective)}. {decision_rule}. Continue attempting to obtain "
-        f"{improvement_text}, carrying forward the success/failure results, next_step, and if_failed_next "
-        "from every previous round. Using the complete benchmark script, the current global parameters, "
-        "state_metric, and the history from the most recent rounds, provide the next global configuration "
-        "that is more likely to surpass the current best result."
+        f"你是数据库参数调优规划器。当前为第 {round_id} 轮，调整层级仅为数据库。"
+        f"数据库：{db_runtime.get('dbms')} {db_runtime.get('db_version')}；工作负载：{workload}。"
+        f"本轮目标是{goal}，期望获得{improvement}。{rule}。"
+        f"基准结果：{_format_result_for_brief(baseline_result, objective)}；"
+        f"已验证最优结果：{_format_result_for_brief(best_result, objective)}。"
+        "依据工作负载解释、实测反馈、参数白名单和兼容经验提出配置。"
+        "保持持久性、隔离级别、观测能力和压测协议不变；没有证据时不要声称单参数因果作用。"
+        "只输出 db_config 或 repeat_benchmark；后续阶段建议只能为 db 或 stop。"
     )
+
 
 
 def _run_db_config_precheck(
@@ -1033,24 +735,16 @@ def _build_db_client(
     return PostgreSQLConnector(ssh=connector, settings=db_settings, dry_run=app_config.dry_run)
 
 
-def collect_full_os_metrics(
-    connector: SSHConnector,
-    app_config: AppConfig,
-    db: MySQLConnector | PostgreSQLConnector | None = None,
-) -> dict[str, Any]:
-    os_metrics = collect_os_metrics(connector, sysctl_keys=app_config.os_metric_keys)
-    storage_context: dict[str, Any] = {}
+def collect_full_os_metrics(connector: SSHConnector, app_config: AppConfig,
+                            db: MySQLConnector | PostgreSQLConnector | None = None) -> dict[str, Any]:
+    """只读系统诊断；不读取或构造任何系统参数搜索空间。"""
+    metrics = collect_os_metrics(connector)
     if db is not None:
-        storage_context = collect_storage_context(connector, db)
-        os_metrics["storage"] = storage_context
-        os_metrics["observability"] = collect_os_observability(connector, storage_context)
-    if app_config.os_controls:
-        os_metrics["controls"] = collect_os_controls(
-            connector,
-            app_config.os_controls,
-            storage_context=storage_context,
-        )
-    return os_metrics
+        storage = collect_storage_context(connector, db)
+        metrics["storage"] = storage
+        metrics["observability"] = collect_os_observability(connector, storage)
+    return metrics
+
 
 
 def build_profile_key(app_config: AppConfig) -> tuple[str, dict[str, Any]]:
@@ -1106,86 +800,14 @@ def serialize_knob_space(
     return payload
 
 
-def normalize_os_current_config(
-    os_metrics: dict[str, Any],
-    os_knobs: dict[str, Any],
-) -> dict[str, Any]:
-    sysctl_values = os_metrics.get("sysctl", {}) or {}
-    normalized: dict[str, Any] = {}
-    for name, raw_value in sysctl_values.items():
-        spec = os_knobs.get(name)
-        if spec is None:
-            continue
-        value_text = str(raw_value).strip()
-        try:
-            if getattr(spec, "type", None) == "integer":
-                normalized[name] = int(value_text)
-            elif getattr(spec, "type", None) == "float":
-                normalized[name] = float(value_text)
-            elif getattr(spec, "type", None) == "boolean":
-                lowered = value_text.lower()
-                if lowered in {"1", "true", "on", "yes"}:
-                    normalized[name] = True
-                elif lowered in {"0", "false", "off", "no"}:
-                    normalized[name] = False
-                else:
-                    normalized[name] = value_text
-            else:
-                normalized[name] = value_text
-        except (TypeError, ValueError):
-            normalized[name] = value_text
-    return normalized
 
 
-def normalize_os_control_current_config(
-    os_metrics: dict[str, Any],
-    os_controls: dict[str, Any],
-) -> dict[str, Any]:
-    control_values = os_metrics.get("controls", {}) or {}
-    normalized: dict[str, Any] = {}
-    for name, payload in control_values.items():
-        spec = os_controls.get(name)
-        if spec is None or not isinstance(payload, dict):
-            continue
-        current_value = payload.get("current_value")
-        if current_value is None or current_value == "mixed":
-            continue
-        try:
-            if getattr(spec, "type", None) == "integer":
-                normalized[name] = int(str(current_value).strip())
-            elif getattr(spec, "type", None) == "float":
-                normalized[name] = float(str(current_value).strip())
-            else:
-                normalized[name] = str(current_value).strip()
-        except (TypeError, ValueError):
-            normalized[name] = current_value
-    return normalized
 
 
-def _relative_score_gain(candidate: BenchmarkResult, incumbent: BenchmarkResult | None) -> float:
-    if incumbent is None or incumbent.score <= 0:
-        return float("inf")
-    return candidate.score / incumbent.score - 1
 
 
-def _p95_not_worse(candidate: BenchmarkResult, incumbent: BenchmarkResult | None) -> bool:
-    if incumbent is None or candidate.p95_latency_ms is None or incumbent.p95_latency_ms is None:
-        return True
-    return candidate.p95_latency_ms <= incumbent.p95_latency_ms
 
 
-def is_os_gray_zone_candidate(
-    candidate: BenchmarkResult,
-    incumbent: BenchmarkResult | None,
-    *,
-    min_gain: float,
-    max_gain: float,
-    require_p95_not_worse: bool = True,
-) -> bool:
-    gain = _relative_score_gain(candidate, incumbent)
-    return min_gain <= gain < max_gain and (
-        not require_p95_not_worse or _p95_not_worse(candidate, incumbent)
-    )
 
 
 _MYSQL_CONTROL_PATH_RISK_KEYS = {
@@ -1375,21 +997,8 @@ def _maybe_apply_mysql_tpch_dynamic_fast_path(
     }
 
 
-def _better_result(left: BenchmarkResult, right: BenchmarkResult) -> BenchmarkResult:
-    return left if left.score >= right.score else right
 
 
-def _gray_zone_reason(
-    *,
-    initial: BenchmarkResult,
-    confirmation: BenchmarkResult,
-    incumbent: BenchmarkResult,
-) -> str:
-    return (
-        "Gray-zone OS improvement confirmed by repeat: "
-        f"incumbent={incumbent.score:.3f}, initial={initial.score:.3f}, "
-        f"repeat={confirmation.score:.3f}."
-    )
 
 
 def attempt_db_restart_repair(
@@ -1509,14 +1118,13 @@ def attempt_db_restart_repair(
             failure_reason = f"Unsupported repair action: {proposal.action_type}"
             continue
 
-        if app_config.auditor.dbms_only:
-            try:
-                enforce_dbms_only(proposal.action_type, proposal.candidate_config)
-            except ValueError as exc:
-                attempt_record["decision"] = "repair_scope_rejected"
-                attempts.append(attempt_record)
-                failure_reason = str(exc)
-                continue
+        try:
+            enforce_dbms_only(proposal.action_type, proposal.candidate_config)
+        except ValueError as exc:
+            attempt_record["decision"] = "repair_scope_rejected"
+            attempts.append(attempt_record)
+            failure_reason = str(exc)
+            continue
         validation = config_validator.validate(proposal.candidate_config, working_config)
         attempt_record["validation"] = validation.to_dict()
         if not validation.passed:
@@ -1604,7 +1212,7 @@ def run_agenticdb(
     use_history: bool = True,
     use_memory_book: bool = True,
 ) -> dict[str, Any]:
-    if app_config.auditor.dbms_only and app_config.auditor.initial_phase != DB_PHASE:
+    if app_config.auditor.initial_phase != DB_PHASE:
         raise ValueError("DBMS-only execution requires initial_phase=db.")
     skill_text = app_config.skill_path.read_text(encoding="utf-8")
     history_path = app_config.history_path if use_history else run_dir / "local_history.json"
@@ -1701,10 +1309,6 @@ def run_agenticdb(
                 "direction": app_config.benchmark.objective.direction,
                 "formula": app_config.benchmark.objective.formula,
             },
-            "os_parameter_count": len(app_config.os_knobs),
-            "os_knobs_path": str(app_config.os_knobs_path) if app_config.os_knobs_path else None,
-            "os_control_count": len(app_config.os_controls),
-            "os_controls_path": str(app_config.os_controls_path) if app_config.os_controls_path else None,
             "parameter_count": len(knob_metadata),
             "parameter_metadata": knob_metadata if app_config.benchmark.metrics.include_parameter_metadata else {},
         }
@@ -1721,8 +1325,6 @@ def run_agenticdb(
 
         best_result = baseline
         best_config = read_current_db_config(db, live_knobs)
-        best_os_config: dict[str, Any] = {}
-        best_os_controls: dict[str, Any] = {}
         baseline_os_metrics = collect_full_os_metrics(connector, app_config, db)
         baseline_db_metrics = collect_db_metrics(db, app_config)
         full_knob_space = serialize_knob_space(live_knobs, best_config)
@@ -1865,18 +1467,6 @@ def run_agenticdb(
                 trace_logger.log_event("stop_policy", {"round_id": round_id, "reason": stop_reason})
                 break
 
-            if audit_decision.next_phase != current_phase and audit_decision.next_phase != STOP_PHASE:
-                previous_phase = current_phase
-                current_phase = audit_decision.next_phase
-                trace_logger.log_event(
-                    "phase_transition",
-                    {
-                        "round_id": round_id,
-                        "from": previous_phase,
-                        "to": current_phase,
-                        "reason": audit_decision.reason,
-                    },
-                )
 
             if not db.is_alive():
                 recovery_reason = (
@@ -1963,8 +1553,6 @@ def run_agenticdb(
             db_metrics = collect_db_metrics(db, app_config)
             current_config = read_current_db_config(db, live_knobs)
             knob_space = serialize_knob_space(live_knobs, current_config)
-            os_knob_space = build_os_knob_space(os_metrics, app_config.os_knobs)
-            os_control_space = build_os_control_space(os_metrics, app_config.os_controls)
             state_snapshot = write_state_snapshot(
                 run_dir=run_dir,
                 db=db,
@@ -1988,15 +1576,12 @@ def run_agenticdb(
 
             prompt = build_prompt(
                 skill_text=skill_text,
-                dbms_only=app_config.auditor.dbms_only,
                 os_metrics=os_metrics,
                 db_metrics=db_metrics,
                 current_config=current_config,
                 db_runtime=db_runtime,
                 profile_context=profile_context,
                 knob_space=knob_space,
-                os_knob_space=os_knob_space,
-                os_control_space=os_control_space,
                 current_phase=current_phase,
                 round_id=round_id,
                 audit_decision=audit_decision,
@@ -2056,8 +1641,6 @@ def run_agenticdb(
                 "current_phase": current_phase,
                 "auditor_state": audit_decision.to_dict(),
                 "os_metrics": os_metrics,
-                "allowed_os_knob_space": os_knob_space,
-                "allowed_os_control_space": os_control_space,
             }
             proposal = llm.generate_json(
                 prompt,
@@ -2110,7 +1693,7 @@ def run_agenticdb(
             logger.info("Round %s proposal: %s", round_id, proposal.action_type)
 
             phase_allowed_actions = allowed_actions_for_phase(
-                current_phase, dbms_only=app_config.auditor.dbms_only,
+                current_phase,
             )
             round_base_metadata = {
                 "phase": current_phase,
@@ -2251,16 +1834,15 @@ def run_agenticdb(
                 )
                 continue
 
-            if app_config.auditor.dbms_only:
-                try:
-                    enforce_dbms_only(proposal.action_type, proposal.candidate_config)
-                except ValueError as exc:
-                    trace_logger.log_event("dbms_only_rejected", {"reason": str(exc)})
-                    memory.save_round(
-                        profile_key, round_id=round_id, proposal=proposal, result=None,
-                        decision="rejected", reason=str(exc), metadata=round_metadata(),
-                    )
-                    continue
+            try:
+                enforce_dbms_only(proposal.action_type, proposal.candidate_config)
+            except ValueError as exc:
+                trace_logger.log_event("dbms_only_rejected", {"reason": str(exc)})
+                memory.save_round(
+                    profile_key, round_id=round_id, proposal=proposal, result=None,
+                    decision="rejected", reason=str(exc), metadata=round_metadata(),
+                )
+                continue
             safety = safety_guard.validate(proposal.action_type, proposal.candidate_config)
             if not safety.passed:
                 trace_logger.log_event("safety_rejected", safety.to_dict())
@@ -2554,344 +2136,6 @@ def run_agenticdb(
                         metadata=round_metadata({"backup": backup.to_dict()}),
                     )
 
-            elif proposal.action_type == "os_config":
-                available_os_knobs = {
-                    name: spec
-                    for name, spec in app_config.os_knobs.items()
-                    if name in (os_metrics.get("sysctl", {}) or {})
-                }
-                os_current_config = normalize_os_current_config(os_metrics, available_os_knobs)
-                os_config_validator = ConfigValidator(
-                    available_os_knobs,
-                    hardware_memory_bytes=app_config.target.hardware_memory_bytes,
-                )
-                os_validation = os_config_validator.validate(proposal.candidate_config, os_current_config)
-                trace_logger.log_event("os_validation", os_validation.to_dict())
-                if not os_validation.passed:
-                    retry_proposal = retry_rejected_proposal(
-                        rejection_stage="os_config_validation",
-                        validation_payload=os_validation.to_dict(),
-                    )
-                    if retry_proposal is not None:
-                        proposal = retry_proposal
-                        os_validation = os_config_validator.validate(proposal.candidate_config, os_current_config)
-                        trace_logger.log_event(
-                            "os_validation",
-                            {
-                                "round_id": round_id,
-                                "retry_attempt": len(round_llm_usage_records) - 1,
-                                **os_validation.to_dict(),
-                            },
-                        )
-                if not os_validation.passed:
-                    memory.save_round(
-                        profile_key,
-                        round_id=round_id,
-                        proposal=proposal,
-                        result=None,
-                        decision="rejected",
-                        reason=os_validation.reason,
-                        metadata=round_metadata({"errors": os_validation.errors}),
-                    )
-                    continue
-
-                previous_values = apply_os_config(connector, os_validation.normalized_config)
-                trace_logger.log_event("apply_os_config", {"previous_values": previous_values})
-                candidate_result = run_benchmark(
-                    connector,
-                    app_config.benchmark,
-                    db_settings,
-                    dry_run=app_config.dry_run,
-                )
-                trace_logger.log_event("benchmark_result", candidate_result.compact_dict())
-                better, decision_reason = result_validator.is_better(
-                    candidate_result,
-                    best_result,
-                    min_relative_gain=app_config.benchmark.objective.min_improvement_ratio,
-                )
-                gray_zone = (
-                    app_config.auditor.os_gray_zone_confirm
-                    and is_os_gray_zone_candidate(
-                        candidate_result,
-                        best_result,
-                        min_gain=app_config.auditor.os_gray_zone_min_gain,
-                        max_gain=app_config.benchmark.objective.min_improvement_ratio,
-                        require_p95_not_worse=not execution_time_objective,
-                    )
-                )
-                if better:
-                    best_result = candidate_result
-                    best_os_config.update(os_validation.normalized_config)
-                    memory.update_best(profile_key, best_result, best_config)
-                    memory.save_round(
-                        profile_key,
-                        round_id=round_id,
-                        proposal=proposal,
-                        result=candidate_result,
-                        decision="accepted",
-                        reason=decision_reason,
-                        metadata=round_metadata({
-                            "previous_values": previous_values,
-                            "effective_candidate_config": os_validation.normalized_config,
-                        }),
-                    )
-                elif gray_zone:
-                    confirmation_result = run_benchmark(
-                        connector,
-                        app_config.benchmark,
-                        db_settings,
-                        dry_run=app_config.dry_run,
-                    )
-                    trace_logger.log_event(
-                        "gray_zone_benchmark_result",
-                        {
-                            "phase": current_phase,
-                            "initial_result": candidate_result.compact_dict(),
-                            "confirmation_result": confirmation_result.compact_dict(),
-                        },
-                    )
-                    confirm_better, confirm_reason = result_validator.is_better(
-                        confirmation_result,
-                        best_result,
-                        min_relative_gain=app_config.benchmark.objective.min_improvement_ratio,
-                    )
-                    confirm_gray_zone = is_os_gray_zone_candidate(
-                        confirmation_result,
-                        best_result,
-                        min_gain=app_config.auditor.os_gray_zone_min_gain,
-                        max_gain=app_config.benchmark.objective.min_improvement_ratio,
-                        require_p95_not_worse=not execution_time_objective,
-                    )
-                    if confirm_better or confirm_gray_zone:
-                        selected_result = _better_result(candidate_result, confirmation_result)
-                        decision_reason = (
-                            confirm_reason
-                            if confirm_better
-                            else _gray_zone_reason(
-                                initial=candidate_result,
-                                confirmation=confirmation_result,
-                                incumbent=best_result,
-                            )
-                        )
-                        best_result = selected_result
-                        best_os_config.update(os_validation.normalized_config)
-                        memory.update_best(profile_key, best_result, best_config)
-                        memory.save_round(
-                            profile_key,
-                            round_id=round_id,
-                            proposal=proposal,
-                            result=selected_result,
-                            decision="accepted",
-                            reason=decision_reason,
-                            metadata=round_metadata({
-                                "previous_values": previous_values,
-                                "effective_candidate_config": os_validation.normalized_config,
-                                "initial_result": candidate_result.compact_dict(),
-                                "confirmation_result": confirmation_result.compact_dict(),
-                                "gray_zone_confirmed": True,
-                            }),
-                        )
-                    else:
-                        rollback_os_config(connector, previous_values)
-                        memory.save_round(
-                            profile_key,
-                            round_id=round_id,
-                            proposal=proposal,
-                            result=confirmation_result,
-                            decision="rollback",
-                            reason=f"Gray-zone OS improvement was not confirmed: {confirm_reason}",
-                            metadata=round_metadata({
-                                "previous_values": previous_values,
-                                "effective_candidate_config": os_validation.normalized_config,
-                                "initial_result": candidate_result.compact_dict(),
-                                "confirmation_result": confirmation_result.compact_dict(),
-                            }),
-                        )
-                else:
-                    rollback_os_config(connector, previous_values)
-                    memory.save_round(
-                        profile_key,
-                        round_id=round_id,
-                        proposal=proposal,
-                        result=candidate_result,
-                        decision="rollback",
-                        reason=decision_reason,
-                        metadata=round_metadata({
-                            "previous_values": previous_values,
-                            "effective_candidate_config": os_validation.normalized_config,
-                        }),
-                    )
-
-            elif proposal.action_type == "os_control":
-                available_os_controls = {
-                    name: spec
-                    for name, spec in app_config.os_controls.items()
-                    if (os_metrics.get("controls", {}).get(name) or {}).get("available")
-                }
-                os_control_current_config = normalize_os_control_current_config(os_metrics, available_os_controls)
-                os_control_validator = OSControlValidator(available_os_controls, os_control_current_config)
-                os_control_validation = os_control_validator.validate(proposal.candidate_config)
-                trace_logger.log_event("os_control_validation", os_control_validation.to_dict())
-                if not os_control_validation.passed:
-                    retry_proposal = retry_rejected_proposal(
-                        rejection_stage="os_control_validation",
-                        validation_payload=os_control_validation.to_dict(),
-                    )
-                    if retry_proposal is not None:
-                        proposal = retry_proposal
-                        os_control_validation = os_control_validator.validate(proposal.candidate_config)
-                        trace_logger.log_event(
-                            "os_control_validation",
-                            {
-                                "round_id": round_id,
-                                "retry_attempt": len(round_llm_usage_records) - 1,
-                                **os_control_validation.to_dict(),
-                            },
-                        )
-                if not os_control_validation.passed:
-                    memory.save_round(
-                        profile_key,
-                        round_id=round_id,
-                        proposal=proposal,
-                        result=None,
-                        decision="rejected",
-                        reason=os_control_validation.reason,
-                        metadata=round_metadata({"errors": os_control_validation.errors}),
-                    )
-                    continue
-
-                storage_context = os_metrics.get("storage", {}) or {}
-                previous_values = apply_os_controls(
-                    connector,
-                    os_control_validation.normalized_config,
-                    app_config.os_controls,
-                    storage_context=storage_context,
-                )
-                trace_logger.log_event("apply_os_controls", {"previous_values": previous_values})
-                candidate_result = run_benchmark(
-                    connector,
-                    app_config.benchmark,
-                    db_settings,
-                    dry_run=app_config.dry_run,
-                )
-                trace_logger.log_event("benchmark_result", candidate_result.compact_dict())
-                better, decision_reason = result_validator.is_better(
-                    candidate_result,
-                    best_result,
-                    min_relative_gain=app_config.benchmark.objective.min_improvement_ratio,
-                )
-                gray_zone = (
-                    app_config.auditor.os_gray_zone_confirm
-                    and is_os_gray_zone_candidate(
-                        candidate_result,
-                        best_result,
-                        min_gain=app_config.auditor.os_gray_zone_min_gain,
-                        max_gain=app_config.benchmark.objective.min_improvement_ratio,
-                        require_p95_not_worse=not execution_time_objective,
-                    )
-                )
-                if better:
-                    best_result = candidate_result
-                    best_os_controls.update(os_control_validation.normalized_config)
-                    memory.update_best(profile_key, best_result, best_config)
-                    memory.save_round(
-                        profile_key,
-                        round_id=round_id,
-                        proposal=proposal,
-                        result=candidate_result,
-                        decision="accepted",
-                        reason=decision_reason,
-                        metadata=round_metadata({
-                            "previous_values": previous_values,
-                            "effective_candidate_config": os_control_validation.normalized_config,
-                        }),
-                    )
-                elif gray_zone:
-                    confirmation_result = run_benchmark(
-                        connector,
-                        app_config.benchmark,
-                        db_settings,
-                        dry_run=app_config.dry_run,
-                    )
-                    trace_logger.log_event(
-                        "gray_zone_benchmark_result",
-                        {
-                            "phase": current_phase,
-                            "initial_result": candidate_result.compact_dict(),
-                            "confirmation_result": confirmation_result.compact_dict(),
-                        },
-                    )
-                    confirm_better, confirm_reason = result_validator.is_better(
-                        confirmation_result,
-                        best_result,
-                        min_relative_gain=app_config.benchmark.objective.min_improvement_ratio,
-                    )
-                    confirm_gray_zone = is_os_gray_zone_candidate(
-                        confirmation_result,
-                        best_result,
-                        min_gain=app_config.auditor.os_gray_zone_min_gain,
-                        max_gain=app_config.benchmark.objective.min_improvement_ratio,
-                        require_p95_not_worse=not execution_time_objective,
-                    )
-                    if confirm_better or confirm_gray_zone:
-                        selected_result = _better_result(candidate_result, confirmation_result)
-                        decision_reason = (
-                            confirm_reason
-                            if confirm_better
-                            else _gray_zone_reason(
-                                initial=candidate_result,
-                                confirmation=confirmation_result,
-                                incumbent=best_result,
-                            )
-                        )
-                        best_result = selected_result
-                        best_os_controls.update(os_control_validation.normalized_config)
-                        memory.update_best(profile_key, best_result, best_config)
-                        memory.save_round(
-                            profile_key,
-                            round_id=round_id,
-                            proposal=proposal,
-                            result=selected_result,
-                            decision="accepted",
-                            reason=decision_reason,
-                            metadata=round_metadata({
-                                "previous_values": previous_values,
-                                "effective_candidate_config": os_control_validation.normalized_config,
-                                "initial_result": candidate_result.compact_dict(),
-                                "confirmation_result": confirmation_result.compact_dict(),
-                                "gray_zone_confirmed": True,
-                            }),
-                        )
-                    else:
-                        rollback_os_controls(connector, previous_values, app_config.os_controls)
-                        memory.save_round(
-                            profile_key,
-                            round_id=round_id,
-                            proposal=proposal,
-                            result=confirmation_result,
-                            decision="rollback",
-                            reason=f"Gray-zone OS control improvement was not confirmed: {confirm_reason}",
-                            metadata=round_metadata({
-                                "previous_values": previous_values,
-                                "effective_candidate_config": os_control_validation.normalized_config,
-                                "initial_result": candidate_result.compact_dict(),
-                                "confirmation_result": confirmation_result.compact_dict(),
-                            }),
-                        )
-                else:
-                    rollback_os_controls(connector, previous_values, app_config.os_controls)
-                    memory.save_round(
-                        profile_key,
-                        round_id=round_id,
-                        proposal=proposal,
-                        result=candidate_result,
-                        decision="rollback",
-                        reason=decision_reason,
-                        metadata=round_metadata({
-                            "previous_values": previous_values,
-                            "effective_candidate_config": os_control_validation.normalized_config,
-                        }),
-                    )
 
         run_rounds = memory.load_rounds_since(profile_key, run_started_at)
         closing_audit = auditor.audit(
@@ -2936,8 +2180,6 @@ def run_agenticdb(
             "baseline": baseline.compact_dict(),
             "best_result": best_result.compact_dict(),
             "best_config": best_config,
-            "best_os_config": best_os_config,
-            "best_os_controls": best_os_controls,
             "final_phase": current_phase,
             "stop_reason": stop_reason or "Maximum tuning round budget reached.",
             "final_audit": final_audit,

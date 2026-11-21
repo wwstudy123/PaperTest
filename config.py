@@ -321,28 +321,8 @@ class SafetySettings:
     max_repair_attempts: int
 
 
-@dataclass(slots=True)
-class OSSettings:
-    knobs_path: str | None = None
-    controls_path: str | None = None
-    metric_keys: list[str] = field(default_factory=list)
 
 
-@dataclass(slots=True)
-class OSControlSpec:
-    name: str
-    type: str
-    path: str | None = None
-    path_glob: str | None = None
-    path_globs: list[str] = field(default_factory=list)
-    target_scope: str | None = None
-    min: int | float | None = None
-    max: int | float | None = None
-    allowed_values: list[Any] | None = None
-    restart_required: bool = False
-    requires_sudo: bool = True
-    context: str | None = None
-    description: str | None = None
 
 
 @dataclass(slots=True)
@@ -355,7 +335,6 @@ class TargetConfig:
     mysql: MySQLSettings | None
     postgres: PostgreSQLSettings | None
     safety: SafetySettings
-    os: OSSettings
 
     @property
     def hardware_memory_bytes(self) -> int:
@@ -604,14 +583,9 @@ class AppConfig:
     target_path: Path
     benchmark_path: Path
     knobs_path: Path
-    os_knobs_path: Path | None
-    os_controls_path: Path | None
     target: TargetConfig
     benchmark: BenchmarkConfig
     knobs: dict[str, KnobSpec]
-    os_knobs: dict[str, KnobSpec]
-    os_controls: dict[str, OSControlSpec]
-    os_metric_keys: list[str]
     auditor: AuditorSettings
     dry_run: bool
     history_path: Path
@@ -652,13 +626,6 @@ def _load_postgres_settings(block: dict[str, Any]) -> PostgreSQLSettings:
     )
 
 
-def _load_os_settings(block: dict[str, Any] | None) -> OSSettings:
-    block = block or {}
-    return OSSettings(
-        knobs_path=block.get("knobs_path"),
-        controls_path=block.get("controls_path"),
-        metric_keys=_coerce_string_list(block.get("metric_keys")),
-    )
 
 
 def _infer_sysbench_mode(raw_workload: str) -> str:
@@ -786,56 +753,17 @@ def _load_metrics_config(raw: dict[str, Any], target: TargetConfig) -> MetricsSe
     )
 
 
-def _resolve_os_knobs_path(project_root: Path, configured_path: str | None) -> Path | None:
-    if configured_path:
-        path = Path(configured_path)
-        return path.resolve() if path.is_absolute() else (project_root / path).resolve()
-    default_path = project_root / "config" / "os_knobs.yaml"
-    return default_path.resolve() if default_path.exists() else None
 
 
-def _resolve_os_controls_path(project_root: Path, configured_path: str | None) -> Path | None:
-    if configured_path:
-        path = Path(configured_path)
-        return path.resolve() if path.is_absolute() else (project_root / path).resolve()
-    default_path = project_root / "config" / "os_controls.yaml"
-    return default_path.resolve() if default_path.exists() else None
 
 
-def _read_os_controls(path: Path) -> dict[str, OSControlSpec]:
-    controls_raw = _read_yaml(path)
-    controls: dict[str, OSControlSpec] = {}
-    for name, spec in controls_raw.items():
-        path_globs = _coerce_string_list(spec.get("path_globs"))
-        if spec.get("path_glob"):
-            path_globs.insert(0, str(spec["path_glob"]))
-        controls[name] = OSControlSpec(
-            name=name,
-            type=str(spec["type"]),
-            path=spec.get("path"),
-            path_glob=spec.get("path_glob"),
-            path_globs=list(dict.fromkeys(path_globs)),
-            target_scope=spec.get("target_scope"),
-            min=spec.get("min"),
-            max=spec.get("max"),
-            allowed_values=spec.get("allowed_values"),
-            restart_required=bool(spec.get("restart_required", False)),
-            requires_sudo=bool(spec.get("requires_sudo", True)),
-            context=spec.get("context"),
-            description=spec.get("description"),
-        )
-    return controls
 
 
 def _normalize_auditor_phase(value: Any) -> str:
     phase = str(value or "db").lower()
     if phase in {"db", "database", "db_config"}:
         return "db"
-    if phase in {"os", "system", "os_config", "os_sysctl", "sysctl", "kernel"}:
-        return "os_sysctl"
-    if phase in {"os_control", "control", "system_control"}:
-        return "os_control"
-    raise ValueError(f"Unsupported auditor initial_phase: {value!r}")
+    raise ValueError(f"只支持数据库调优阶段 db，收到：{value!r}")
 
 
 def load_app_config(
@@ -849,11 +777,16 @@ def load_app_config(
     target_raw = _read_yaml(target_path)
     benchmark_raw = _read_yaml(benchmark_path)
 
+    if "os" in target_raw:
+        raise ValueError("已删除操作系统调优配置，请移除 target 文件中的 os 段")
     target_block = target_raw["target"]
     ssh_block = target_raw["ssh"]
     safety_block = target_raw["safety"]
-    os_block = target_raw.get("os", {}) or {}
     auditor_block = target_raw.get("auditor", target_raw.get("tuning_control", {})) or {}
+
+    unsupported = {k for k in auditor_block if k.startswith(("os_", "min_os_")) or k == "dbms_only"}
+    if unsupported:
+        raise ValueError(f"已移除的审计配置项：{sorted(unsupported)}")
 
     ssh = SSHSettings(
         use_jump_host=bool(ssh_block.get("use_jump_host", False)),
@@ -875,7 +808,6 @@ def load_app_config(
         auto_repair_on_restart_failure=bool(safety_block.get("auto_repair_on_restart_failure", True)),
         max_repair_attempts=int(safety_block.get("max_repair_attempts", 2)),
     )
-    os_settings = _load_os_settings(os_block)
     target = TargetConfig(
         dbms=str(target_block["dbms"]),
         db_version=target_block.get("db_version"),
@@ -885,7 +817,6 @@ def load_app_config(
         mysql=_load_mysql_settings(target_raw["mysql"]) if target_raw.get("mysql") else None,
         postgres=_load_postgres_settings(target_raw["postgres"]) if target_raw.get("postgres") else None,
         safety=safety,
-        os=os_settings,
     )
 
     benchmark = BenchmarkConfig(
@@ -913,23 +844,11 @@ def load_app_config(
         knobs = _with_mysql_benchmark_extensions(knobs)
     elif target.dbms.lower() in {"postgres", "postgresql"}:
         knobs = _with_postgres_benchmark_extensions(knobs)
-    os_knobs_path = _resolve_os_knobs_path(project_root, target.os.knobs_path)
-    os_knobs = _read_knobs(os_knobs_path) if os_knobs_path is not None and os_knobs_path.exists() else {}
-    os_controls_path = _resolve_os_controls_path(project_root, target.os.controls_path)
-    os_controls = _read_os_controls(os_controls_path) if os_controls_path is not None and os_controls_path.exists() else {}
-    os_metric_keys = list(dict.fromkeys([*os_knobs.keys(), *target.os.metric_keys]))
     auditor = AuditorSettings(
-        dbms_only=bool(auditor_block.get("dbms_only", False)),
         enabled=bool(auditor_block.get("enabled", True)),
         initial_phase=_normalize_auditor_phase(auditor_block.get("initial_phase", "db")),
         min_db_rounds=int(auditor_block.get("min_db_rounds", 5)),
         db_plateau_patience=int(auditor_block.get("db_plateau_patience", 3)),
-        min_os_rounds=int(auditor_block.get("min_os_rounds", 2)),
-        os_plateau_patience=int(auditor_block.get("os_plateau_patience", 2)),
-        min_os_control_rounds=int(auditor_block.get("min_os_control_rounds", 1)),
-        os_control_plateau_patience=int(auditor_block.get("os_control_plateau_patience", 2)),
-        os_gray_zone_min_gain=float(auditor_block.get("os_gray_zone_min_gain", 0.003)),
-        os_gray_zone_confirm=bool(auditor_block.get("os_gray_zone_confirm", True)),
         repeat_benchmark_patience=int(auditor_block.get("repeat_benchmark_patience", 2)),
         respect_model_phase_recommendation=bool(auditor_block.get("respect_model_phase_recommendation", True)),
         model_recommendation_min_rounds=int(auditor_block.get("model_recommendation_min_rounds", 3)),
@@ -945,14 +864,9 @@ def load_app_config(
         target_path=target_path,
         benchmark_path=benchmark_path,
         knobs_path=knobs_path,
-        os_knobs_path=os_knobs_path,
-        os_controls_path=os_controls_path,
         target=target,
         benchmark=benchmark,
         knobs=knobs,
-        os_knobs=os_knobs,
-        os_controls=os_controls,
-        os_metric_keys=os_metric_keys,
         auditor=auditor,
         dry_run=dry_run,
         history_path=runtime_state_root / "tuning_history.json",

@@ -1,65 +1,59 @@
-# ADMTune staged implementation status
+# ADMTune 实施状态
 
-Updated 2026-11-21. Implementation status is separate from experimental evidence.
+更新时间：2026-11-21。代码实现状态与真实实验结论必须分开记录。
 
-Local verification: 54 tests passed. Static and A-B-A synthetic matrices each
-cover seven variants and three seeds. These are not live database experiments.
+本轮回归验证：64 项测试通过；另有静态与 A→B→A 两组模拟矩阵，每组 21 次。未执行真实数据库或付费模型调用。
 
-| Gate | Status | Evidence / next step |
+## 已实现与待完成
+
+| 项目 | 状态 | 验证或下一步 |
 |---|---|---|
-| Repository provenance and secret/output ignores | Implemented | Separate commits; ignored local files and generated runs |
-| DBMS-only upstream baseline restriction | Implemented | Deterministic action/phase/protected-parameter tests |
-| Frozen SQL templates and workload phases | Implemented offline | AST/DBSCAN/unknown-channel/confirmation tests |
-| Selector/pruner/multi-candidate roles | Implemented | Heuristic fixture and opt-in inherited API client; strict controller validation |
-| Log-target GP and LCB/UCB | Implemented offline | Numerical, noise, encoding and ranking-reversal tests |
-| Versioned history and reflection evidence | Implemented | Compatibility, atomic consumption, failure and deduplication tests |
-| Synthetic A-B-A and ablations | Implemented | Seven variants, multiple independent simulator seeds; JSON/CSV audit |
-| MySQL apply/readback/measure/restore adapter | Fake-connector tested | Not yet verified on the user's server |
-| Real static preflight/pilot/tune commands | Implemented, not executed | Follow LIVE_RUNBOOK with local credentials |
-| Real dynamic offered-load and replay driver | Pending deployment integration | Must not substitute completion TPS or synthetic windows |
-| AgentTune baseline on shared real protocol | Pending | Do not label heuristic proposer or no-GP variant as AgentTune |
-| Complete OLAP execution | Pending | No success label for incomplete query sets |
-| Formal database results | Not produced | Requires server gates, fixed protocol, repeats and independent verification |
+| 来源与文件隔离 | 已实现 | 凭证、本地配置、数据、日志和备份不提交 |
+| 数据库层调整范围 | 已实现 | 系统调优代码已直接删除，数据库平台期只允许停止 |
+| SQL 模板与负载阶段 | 已实现离线版本 | 语法树、聚类、未知通道、连续确认和稳定观察测试 |
+| 参数选择、裁剪和推荐 | 已实现 | 启发式替身与显式授权的模型客户端；输出经程序校验 |
+| 对数目标 GP 与置信界调度 | 已实现离线版本 | 数值、噪声、编码与排序反转测试 |
+| 历史观测与反思证据 | 已实现 | 兼容过滤、原子消费、去重及失败保护测试 |
+| 合成 A→B→A 与消融 | 已实现 | 七个变体、三个种子及 JSON/CSV 审计 |
+| MySQL 应用、回读和恢复 | 模拟连接器已验证 | 尚未在用户实验机上完成验证 |
+| 实机预检、手工试验与静态调优 | 命令已提供，未实际执行 | 按实机手册填写私有配置 |
+| 真实外部请求与动态回放 | 待集成 | 不能使用完成 TPS 或模拟窗口替代 |
+| 同协议 AgentTune 基线 | 待完成 | 启发式替身和无代理消融不能冒充该基线 |
+| 完整 OLAP 执行 | 待完成 | 查询集合不完整时不能生成成功标签 |
+| 正式数据库结果 | 尚未产生 | 需要实机验证、协议冻结、独立重复和最终复测 |
 
-## Cost policy
+## 系统调优删除范围
 
-- Offline tests, simulator and matrix use no LLM API and no database connection.
-- Paid role calls require `--backend llm --allow-paid-llm`, configured endpoint/model
-  and global call/token budgets.
-- No implicit API retries or heuristic fallback in paid mode.
-- Failed/unknown-usage calls retain their budget reservation.
-- Final verification reserves trial slots rather than running outside the budget.
-- Simulation reports count heuristic role invocations separately from API calls.
-- Live preflight captures untuned connection/global buffer settings for the joint
-  memory screen. This is a screening estimate, not a bound on total process RSS.
+已删除系统参数搜索空间、配置类型与加载器、应用和恢复工具、控制项校验器、审计切换、启发式建议、模拟写入、经验摘要字段和报告分支。
 
-## Report interpretation
+`agenticdb` 与 ADMTune 都只支持数据库动作，不再提供 `--dbms-only` 开关。旧配置中的系统调优段和已移除审计选项会明确报错，不会被静默忽略。
 
-`suite.csv` and `suite.json` are descriptive plumbing reports, not performance
-claims. Target misses remain null instead of being excluded. Prediction errors
-and coverage use pretrial predictions on selected online observations, so they
-remain selection-biased; a separately sampled audit set is needed for calibrated
-generalization claims. Interval width is reported together with coverage.
+保留的系统采集器只读取 CPU、内存、磁盘、压力和 I/O 诊断信息。数据库服务重启属于数据库执行生命周期，并不等于系统参数调优。
 
-Per-run manifests freeze seed, catalog, environment IDs, encoding, policy and
-source revision. They record installed dependency versions, a dirty-tree flag
-and a working-source hash so tests made before commit are not mislabeled as clean.
-Live manifests also save initial-state readback and benchmark
-protocol. `summary.json` reports final independent values separately from the
-best value selected during search. Total live command wall time includes preflight
-and final restoration; the tuning ledger separately reports active tuning time.
+## 成本与执行规则
 
-## Next actual operation
+- 离线测试和模拟矩阵不调用模型接口、不连接数据库。
+- 付费角色需要明确的接口、模型、`--allow-paid-llm` 及全局调用和令牌预算。
+- 付费模式不隐式重试、不静默降级；失败且无法获得用量的请求保留预算预留。
+- 最终复测占用试验预算，不能算作预算外免费操作。
+- 启发式角色调用次数与真实接口调用次数分开记录。
+- 实机预检读取未调参数中的连接数和缓冲区配置，用于联合内存筛查；该估计不是总内存占用的数学上界。
 
-1. On the dedicated Linux MySQL machine, create ignored local configs and `.env`.
-2. Run only `admtune.live preflight`; examine version, config values, service path,
-   invariant readback, schema and table count.
-3. Run manual baseline and a small known-legal delta, without any LLM.
-4. Verify recovery, then run a small static heuristic smoke.
-5. Only after those gates, select the model and authorize a bounded LLM pilot.
-6. Integrate real offered-load telemetry before dynamic experiments; calibrate
-   thresholds independently, freeze formal experiment protocols and baselines.
+## 报告解释
 
-Run one experiment at a time per database instance. The first adapter does not
-provide distributed instance locking or automatic data-snapshot restoration.
-Do not start concurrent tuning processes against the same service.
+合成 `suite.json` 和 `suite.csv` 仅是链路审计。未达到收益门限的运行保留空值，不剔除失败项后只统计成功项。
+
+预测误差与覆盖率使用试验前预测，但只覆盖被选中的在线观测，仍有选择偏差。需要另设抽样审计集，才能评价更一般的校准能力。覆盖率必须与区间宽度共同报告。
+
+运行清单保存种子、参数全集、环境标识、依赖、Git 提交号、未提交修改标记和源码哈希。实机另存基准状态与测量协议。独立复测值不回填为搜索最优值。总命令耗时包含预检和最终恢复，调优账本另行记录活动时间。
+
+## 下一步实际操作
+
+1. 在专用 Linux 实验机填写被忽略的 `configs/local/` 和 `.env`。
+2. 仅运行预检，核对版本、配置、服务、持久性、结构及表数。
+3. 不接模型，验证基准与一个已核验的小改动，确认恢复成功。
+4. 再执行小预算静态启发式试运行。
+5. 上述门槛通过后，选择模型并明确授权小预算调用。
+6. 集成外部请求与回放，独立校准阈值，再冻结正式基线和消融协议。
+
+同一数据库实例一次只运行一个调优进程。当前没有分布式实例锁，也不自动恢复数据快照。

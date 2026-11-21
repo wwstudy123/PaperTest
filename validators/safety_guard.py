@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from models import ValidationResult
+from dbms_policy import enforce_dbms_only
 
 
 class SafetyGuard:
-    _allowed_actions = {"db_config", "os_config", "os_control", "repeat_benchmark"}
+    _allowed_actions = {"db_config", "repeat_benchmark"}
     _allowed_db_exact_keys = {
         "performance_schema_max_digest_length",
         "performance_schema_max_digest_sample_age",
@@ -23,7 +24,6 @@ class SafetyGuard:
         "workload_script",
         "report_interval",
     }
-    _allowed_sysctl_prefixes = ("vm.", "fs.", "net.core.", "net.ipv4.", "kernel.")
     _blocked_db_exact_keys = {
         "autocommit",
         "basedir",
@@ -89,6 +89,10 @@ class SafetyGuard:
     )
 
     def validate(self, action_type: str, candidate_config: dict[str, Any]) -> ValidationResult:
+        try:
+            enforce_dbms_only(action_type, candidate_config)
+        except ValueError as exc:
+            return ValidationResult(passed=False, reason=str(exc), errors=["database_scope_violation"])
         if action_type not in self._allowed_actions:
             return ValidationResult(
                 passed=False,
@@ -123,15 +127,6 @@ class SafetyGuard:
                     reason=f"Blocked unsafe DB knob(s): {', '.join(unsafe_db_keys)}",
                     errors=["unsafe_db_knob"],
                 )
-
-        if action_type == "os_config":
-            for key in candidate_config:
-                if not key.startswith(self._allowed_sysctl_prefixes):
-                    return ValidationResult(
-                        passed=False,
-                        reason=f"Blocked OS knob: {key}",
-                        errors=["unsafe_os_knob"],
-                    )
 
         return ValidationResult(passed=True, reason="Safety guard passed.")
 

@@ -74,24 +74,9 @@ def _build_score_points(
 
 
 def _build_phase_markers(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    markers: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    labels = {
-        "os_sysctl": "os_sysctl starts",
-        "os_control": "os_control starts",
-    }
-    for point in points:
-        phase = str(point.get("phase") or "")
-        if phase in labels and phase not in seen:
-            seen.add(phase)
-            markers.append(
-                {
-                    "phase": phase,
-                    "label": labels[phase],
-                    "elapsed_seconds": float(point.get("elapsed_seconds") or 0.0),
-                }
-            )
-    return markers
+    # 单一数据库调整层级，不生成系统调优切换标记。
+    return []
+
 
 
 def _summarize_llm_usage_records(records: Any) -> dict[str, int]:
@@ -163,7 +148,7 @@ def _write_score_curve_svg(
     lines = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
         "<style>",
-        "text { font-family: Segoe UI, Arial, sans-serif; fill: #172033; font-size: 13px; }",
+        "text { font-family: Noto Sans CJK SC, Microsoft YaHei, Segoe UI, Arial, sans-serif; fill: #172033; font-size: 13px; }",
         ".grid { stroke: #d9e0ea; stroke-width: 1; }",
         ".phase-line { stroke: #7c8798; stroke-width: 1.6; stroke-dasharray: 7 6; }",
         ".phase-label { fill: #475569; font-size: 12px; font-weight: 650; }",
@@ -233,7 +218,7 @@ def _write_score_curve_svg(
         [
             f'<line class="axis" x1="{left}" y1="{height - bottom}" x2="{width - right}" y2="{height - bottom}"/>',
             f'<line class="axis" x1="{left}" y1="{top}" x2="{left}" y2="{height - bottom}"/>',
-            f'<text x="{left + plot_w / 2:.2f}" y="{height - 6}" text-anchor="middle">elapsed time</text>',
+            f'<text x="{left + plot_w / 2:.2f}" y="{height - 6}" text-anchor="middle">运行时间</text>',
             f'<text transform="translate(20 {top + plot_h / 2:.2f}) rotate(-90)" text-anchor="middle">{escape(y_axis_label)}</text>',
             f'<polyline class="curve" points="{polyline}"/>',
         ]
@@ -269,13 +254,13 @@ def write_run_report(
     )
     phase_markers = _build_phase_markers(score_points)
     execution_time_objective = _is_execution_time_objective(profile_context)
-    curve_label = "Execution-time curve" if execution_time_objective else "TPS/p95 curve"
+    curve_label = "完整执行时间曲线" if execution_time_objective else "目标得分曲线"
     _write_score_curve_svg(
         score_curve_path,
         score_points,
-        title="Execution time over elapsed time" if execution_time_objective else "TPS / p95 over elapsed time",
+        title="完整执行时间随调优进度变化" if execution_time_objective else "目标得分随调优进度变化",
         value_key="primary_metric_value" if execution_time_objective else "score",
-        y_axis_label="execution time (ms)" if execution_time_objective else "TPS / p95",
+        y_axis_label="执行时间（毫秒）" if execution_time_objective else "目标得分",
         phase_markers=phase_markers,
     )
 
@@ -353,23 +338,23 @@ def write_run_report(
             )
 
     lines = [
-        "# AgenticDB Run Report",
+        "# AgenticDB 数据库调优运行报告",
         "",
-        f"- Profile: `{profile_key}`",
-        f"- DBMS: `{profile_context.get('dbms', 'unknown')}`",
-        f"- Workload: `{profile_context.get('workload', 'unknown')}`",
-        f"- Objective: `{profile_context.get('objective_formula', 'unknown')}`",
-        f"- Runtime parameter count: `{summary.get('db_runtime', {}).get('parameter_count', 'unknown')}`",
-        f"- Active global tuning parameter count: `{summary.get('db_runtime', {}).get('selected_parameter_count', 'unknown')}`",
-        f"- Baseline score: `{baseline.score:.6f}`",
-        f"- Best score: `{best_result.score:.6f}`",
-        f"- Best primary metric: `{best_result.primary_metric_name}={best_result.primary_metric_value}`",
-        f"- Elapsed seconds: `{summary.get('elapsed_seconds', 'unknown')}`",
-        f"- Final phase: `{summary.get('final_phase', 'unknown')}`",
-        f"- Stop reason: `{summary.get('stop_reason', 'unknown')}`",
+        f"- 实验标识： `{profile_key}`",
+        f"- 数据库： `{profile_context.get('dbms', 'unknown')}`",
+        f"- 工作负载： `{profile_context.get('workload', 'unknown')}`",
+        f"- 优化目标： `{profile_context.get('objective_formula', 'unknown')}`",
+        f"- 运行时参数数量： `{summary.get('db_runtime', {}).get('parameter_count', 'unknown')}`",
+        f"- 活动调优参数数量： `{summary.get('db_runtime', {}).get('selected_parameter_count', 'unknown')}`",
+        f"- 基准得分： `{baseline.score:.6f}`",
+        f"- 最优得分： `{best_result.score:.6f}`",
+        f"- 最优主指标： `{best_result.primary_metric_name}={best_result.primary_metric_value}`",
+        f"- 耗时秒数： `{summary.get('elapsed_seconds', 'unknown')}`",
+        f"- 最终阶段： `{summary.get('final_phase', 'unknown')}`",
+        f"- 停止原因： `{summary.get('stop_reason', 'unknown')}`",
         f"- {curve_label}: `{score_curve_path.name}`",
         "",
-        "## Best Config",
+        "## 最优配置",
         "",
         "```json",
         json.dumps(best_config, ensure_ascii=False, indent=2),
@@ -380,16 +365,16 @@ def write_run_report(
     if llm_usage_summary:
         lines.extend(
             [
-                "## LLM Usage",
+                "## 大语言模型调用开销",
                 "",
-                f"- Model: `{llm_usage_summary.get('model', 'unknown')}`",
-                f"- Base URL: `{llm_usage_summary.get('base_url', 'unknown')}`",
-                f"- Calls: `{llm_usage_summary.get('call_count', 0)}`",
-                f"- Input tokens: `{llm_usage_summary.get('input_tokens', 0)}`",
-                f"- Output tokens: `{llm_usage_summary.get('output_tokens', 0)}`",
-                f"- Total tokens: `{llm_usage_summary.get('total_tokens', 0)}`",
-                f"- Cached tokens: `{llm_usage_summary.get('cached_tokens', 0)}`",
-                f"- Usage records: `{Path(str(llm_usage_summary.get('records_path', 'llm_usage.json'))).name}`",
+                f"- 模型： `{llm_usage_summary.get('model', 'unknown')}`",
+                f"- 接口地址： `{llm_usage_summary.get('base_url', 'unknown')}`",
+                f"- 调用次数： `{llm_usage_summary.get('call_count', 0)}`",
+                f"- 输入令牌： `{llm_usage_summary.get('input_tokens', 0)}`",
+                f"- 输出令牌： `{llm_usage_summary.get('output_tokens', 0)}`",
+                f"- 总令牌： `{llm_usage_summary.get('total_tokens', 0)}`",
+                f"- 缓存令牌： `{llm_usage_summary.get('cached_tokens', 0)}`",
+                f"- 调用记录： `{Path(str(llm_usage_summary.get('records_path', 'llm_usage.json'))).name}`",
                 "",
             ]
         )
@@ -401,7 +386,7 @@ def write_run_report(
     if workload_interpretation:
         lines.extend(
             [
-                "## Workload Interpretation",
+                "## 工作负载解释",
                 "",
                 "```json",
                 json.dumps(workload_interpretation, ensure_ascii=False, indent=2),
@@ -409,33 +394,11 @@ def write_run_report(
                 "",
             ]
         )
-    if summary.get("best_os_config"):
-        lines.extend(
-            [
-                "## Best OS Config",
-                "",
-                "```json",
-                json.dumps(summary.get("best_os_config"), ensure_ascii=False, indent=2),
-                "```",
-                "",
-            ]
-        )
-    if summary.get("best_os_controls"):
-        lines.extend(
-            [
-                "## Best OS Controls",
-                "",
-                "```json",
-                json.dumps(summary.get("best_os_controls"), ensure_ascii=False, indent=2),
-                "```",
-                "",
-            ]
-        )
     lines.extend(
         [
-            "## Rounds",
+            "## 调优轮次",
             "",
-            "| round | phase | decision | action | changed_keys | score | primary_metric |",
+            "| 轮次 | 阶段 | 决策 | 动作 | 变更参数 | 得分 | 主指标 |",
             "| --- | --- | --- | --- | --- | --- | --- |",
         ]
     )
@@ -463,24 +426,24 @@ def write_run_report(
         or (entry.get("proposal") or {}).get("auditor_recommendation")
     ]
     if strategy_entries:
-        lines.extend(["", "## Strategy Signals", ""])
+        lines.extend(["", "## 搜索策略反馈", ""])
         for entry in strategy_entries:
             proposal = entry.get("proposal", {}) or {}
             lines.extend(
                 [
-                    f"### Round {entry.get('round_id')}",
+                    f"### 第 {entry.get('round_id')}",
                     "",
-                    f"- Exploration mode: `{proposal.get('exploration_mode', 'normal')}`",
-                    f"- Auditor recommendation: `{(proposal.get('auditor_recommendation') or {}).get('next_phase', '')}`",
-                    f"- Next step: {proposal.get('next_step') or ''}",
-                    f"- If failed next: {proposal.get('if_failed_next') or ''}",
+                    f"- 探索模式： `{proposal.get('exploration_mode', 'normal')}`",
+                    f"- 审计建议： `{(proposal.get('auditor_recommendation') or {}).get('next_phase', '')}`",
+                    f"- 后续动作： {proposal.get('next_step') or ''}",
+                    f"- 失败后的动作： {proposal.get('if_failed_next') or ''}",
                 ]
             )
             auditor_recommendation = proposal.get("auditor_recommendation") or {}
             if auditor_recommendation:
                 lines.extend(
                     [
-                        "- Auditor recommendation detail:",
+                        "- 审计建议详情：",
                         "",
                         "```json",
                         json.dumps(auditor_recommendation, ensure_ascii=False, indent=2),
@@ -491,7 +454,7 @@ def write_run_report(
             if aggressive_plan:
                 lines.extend(
                     [
-                        "- More aggressive plan:",
+                        "- 后续探索方案：",
                         "",
                         "```json",
                         json.dumps(aggressive_plan, ensure_ascii=False, indent=2),
