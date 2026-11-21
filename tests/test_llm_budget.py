@@ -1,5 +1,8 @@
 import unittest
 from unittest.mock import Mock
+from pathlib import Path
+import tempfile
+import json
 
 from admtune.agents import AgenticDBBackend
 from admtune.budget import BudgetExhausted, Ledger, Limits
@@ -39,6 +42,19 @@ class LLMBudgetTests(unittest.TestCase):
         self.assertGreater(ledger.llm_tokens, 0)
         with self.assertRaises(BudgetExhausted):
             backend.complete("selector", {})
+
+    def test_audit_trace_has_usage_but_never_credentials(self):
+        client = self.client()
+        with tempfile.TemporaryDirectory() as folder:
+            backend = AgenticDBBackend(
+                client, Ledger(Limits(llm_calls=1, llm_tokens=10000)),
+                trace_dir=Path(folder),
+            )
+            backend.complete("selector", {"catalog": []})
+            text = (Path(folder) / "001-selector.json").read_text()
+            self.assertNotIn(client.api_key, text)
+            self.assertEqual(json.loads(text)["usage"]["total_tokens"], 50)
+            self.assertEqual(json.loads(text)["response"], {"selected": ["buffer"]})
 
 
 if __name__ == "__main__":

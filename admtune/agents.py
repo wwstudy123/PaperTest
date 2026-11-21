@@ -3,37 +3,45 @@ from __future__ import annotations
 import json
 import math
 import random
+from pathlib import Path
+import time
 from typing import Protocol
 
 from .budget import Ledger
 from .contracts import Candidate, fingerprint
 from .space import Space
+from .security import redact
 
 
 PROMPTS = {
     "selector": (
-        "Select useful DBMS parameters from the supplied fixed catalog. Runtime metrics "
-        "are diagnostic, not causal evidence. Do not change durability or benchmark "
-        "semantics. Return JSON: selected (list of names), rationale (text)."
+        "你负责选择数据库参数。依据负载、诊断与实测历史，从 catalog 选择不超过 "
+        "max_selected 个唯一参数名。运行指标只是诊断，不是因果证据。保持持久性和压测语义不变。"
+        '仅返回 JSON：{"selected":["目录中的参数名"],"rationale":"简短依据"}。'
     ),
     "pruner": (
-        "Suggest preferred ranges for selected DBMS knobs, within their immutable hard "
-        "bounds. Keep automatic/sentinel values separate and preserve granularity. "
-        "Return JSON: ranges mapping each selected name to lower, upper, choices, special."
+        "你负责建议优先搜索范围。selected 中每个参数必须且只能出现一次。硬边界与步长不能改变。"
+        "数值上下界必须位于 catalog 边界内，且与 lower 加整数倍 step 对齐；单位沿用目录，"
+        "字节值必须输出数字，不能输出 GB 等字符串。枚举值只能来自目录。"
+        '仅返回 {"ranges":{"参数名":{"lower":数值或null,"upper":数值或null,"choices":[],"special":[]}}}。'
+        "每项严格保留这四个字段；数值参数的 choices 为空数组，枚举参数的 lower/upper 为 null。"
+        "special 只能选目录中已有的特殊值。不要增加 step、解释或其他字段。"
     ),
     "recommender": (
-        "Propose several small DBMS configuration deltas around the measured parent. "
-        "Use only selected knobs and preferred ranges. Unchanged knobs inherit parent "
-        "values. Histories are observations, not guaranteed causes. Return JSON: "
-        "candidates, a list of delta dictionaries; do not invent measured outcomes."
+        "你负责围绕实测父配置 parent 生成数据库配置变更，最多 batch_size 个。"
+        "仅使用 selected 参数与 ranges 范围，严格遵循 catalog 的类型、特殊值和步长。"
+        "未改参数继承父配置；每个候选至少一项实际变化，候选之间不同。"
+        "结合 feedback 避免重复被拒绝的配置。历史只证明观测到的组合效果，不是因果规律。"
+        '仅返回 {"candidates":[{"参数名":具体数值或枚举值}]}。'
+        "每项直接是变更字典，不嵌套 config，不增加说明字段，不虚构实测收益。"
     ),
     "reflection": (
-        "Summarize only new evidence, using bounded old summaries for context. Return "
-        "exactly facts, hypotheses, conditions, actions, evidence_ids. Facts must be "
-        "objects copied from provided fact records (trial_id/status/value). Hypotheses "
-        "are unverified text. Conditions contain environment_key and objective_key. "
-        "Actions are resample/adjust_range/reselect/verify/stop. Never change hard "
-        "constraints or mark unexecuted candidates successful."
+        "你负责归纳新增执行证据，旧摘要只作背景。仅输出 facts、hypotheses、conditions、actions、"
+        "evidence_ids 五个字段。facts 必须完整复制输入 facts 的 trial_id/status/value，"
+        "不得遗漏、修改数字、改变状态或添加文字事实。conditions 原样复制输入条件。"
+        "hypotheses 是待验证解释的字符串数组，不是确定性规则。"
+        "actions 是字符串数组，只能选 resample/adjust_range/reselect/verify/stop。"
+        "evidence_ids 列出全部所引用的试验编号。不要改变硬约束，不将未执行配置标记为成功。"
     ),
 }
 
@@ -97,12 +105,13 @@ class HeuristicBackend:
 class AgenticDBBackend:
     """Reuse the upstream API client with no silent heuristic fallback or retries."""
 
-    def __init__(self, client, ledger: Ledger, *, max_output_tokens: int = 1500):
+    def __init__(self, client, ledger: Ledger, *, max_output_tokens: int = 1500, trace_dir: Path | None = None):
         if client.dry_run or not client.api_key or not client.model:
             raise ValueError("Explicit real LLM client settings required")
         self.client, self.ledger, self.max_output_tokens = client, ledger, max_output_tokens
         self.client.response_retries = 0
         self.cache: dict[str, dict] = {}
+        self.trace_dir = trace_dir
 
     def complete(self, role: str, payload: dict) -> dict:
         text = json.dumps(payload, ensure_ascii=False, sort_keys=True, allow_nan=False)
@@ -112,6 +121,8 @@ class AgenticDBBackend:
         # Byte-length is a conservative reservation, not a reported tokenizer count.
         reservation = len((PROMPTS[role] + text).encode()) + self.max_output_tokens + 64
         self.ledger.reserve_llm(reservation)
+        started = time.monotonic()
+        trace = {"role": role, "model": self.client.model, "system_prompt": PROMPTS[role], "payload": payload}
         try:
             result = self.client._call_openai_compatible(
                 text, operation=f"admtune_{role}", system_prompt=PROMPTS[role],
@@ -120,8 +131,20 @@ class AgenticDBBackend:
                     self.ledger.remaining_seconds() - self.ledger.limits.recovery_reserve_seconds
                 ))),
             )
+            trace["response"] = result
+        except Exception as exc:
+            trace["error"] = redact(str(exc))
+            raise
         finally:
             usage = self.client.consume_last_usage()
+            trace.update(usage=usage, elapsed_seconds=time.monotonic() - started)
+            if self.trace_dir is not None:
+                self.trace_dir.mkdir(parents=True, exist_ok=True)
+                path = self.trace_dir / f"{self.ledger.llm_calls:03d}-{role}.json"
+                serialized = redact(json.dumps(trace, ensure_ascii=False, indent=2))
+                serialized = serialized.replace(self.client.api_key, "<redacted>")
+                path.write_text(serialized + "\n", encoding="utf-8")
+                path.chmod(0o600)
             self.ledger.settle_llm(reservation, usage.get("total_tokens") if usage else None)
         if not isinstance(result, dict):
             raise ValueError("Agent output must be a JSON object")

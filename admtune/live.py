@@ -57,7 +57,7 @@ def static_tune(executor, space, environment, output, *, seed, trials, wall_seco
             raise ValueError("Explicit API key, base URL and model required for paid LLM")
         client = LLMClient.from_env(dry_run=False)
         client.allow_fallback = False
-        backend = AgenticDBBackend(client, ledger)
+        backend = AgenticDBBackend(client, ledger, trace_dir=output / "llm_calls")
     else:
         backend = HeuristicBackend(seed)
     store = Store(output / "records.sqlite3")
@@ -79,6 +79,14 @@ def static_tune(executor, space, environment, output, *, seed, trials, wall_seco
         store.event("budget_stop", {"reason": str(exc)})
         return controller.finalize()
     finally:
+        if backend_kind == "llm":
+            (output / "llm_usage.json").write_text(
+                json.dumps({
+                    **client.usage_summary(),
+                    "budget": ledger.snapshot(),
+                    "note": "成功返回用量的请求与总尝试预算分开记录；失败且未知用量的调用保留预算预留。",
+                }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8",
+            )
         with (output / "trials.jsonl").open("w") as handle:
             for record in store.trials():
                 handle.write(json.dumps(record.to_dict(), allow_nan=False) + "\n")
@@ -113,7 +121,7 @@ def main() -> int:
         parser.error("LLM requests require --allow-paid-llm.")
     if args.command == "tune-static" and args.trials < 8:
         parser.error("Reserve at least eight slots for baseline, startup, search and verification.")
-    load_dotenv(args.env_file)
+    load_dotenv(args.env_file, override=True)
     args.output.mkdir(parents=True, exist_ok=False)
     root = Path(__file__).resolve().parent.parent
     app = load_app_config(
