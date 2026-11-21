@@ -10,6 +10,19 @@ Deployment credentials belong in ignored `configs/local/` or environment
 variables, never in committed examples. Generated runs and database backups
 are ignored by Git.
 
+## Safe offline start
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m admtune.cli --simulate --scenario aba --seed 0 --trials 24
+```
+
+This is a **synthetic simulation with a heuristic proposer**, not a MySQL
+experiment and not an LLM evaluation. No API key, GPU or live DB is needed.
+See [`docs/OFFLINE.md`](docs/OFFLINE.md) for variants and numerical contracts.
+
 ## Upstream AgenticDB reference
 
 Core implementation for the AgenticDB paper.

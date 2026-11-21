@@ -174,6 +174,7 @@ class LLMClient:
         system_prompt: str,
         timeout_s: int | None = None,
         conversation_messages: list[dict[str, str]] | None = None,
+        max_output_tokens: int | None = None,
     ) -> dict[str, Any]:
         self.last_usage = None
         self.last_retry_events = []
@@ -201,6 +202,8 @@ class LLMClient:
             "response_format": {"type": "json_object"},
             "messages": messages,
         }
+        if max_output_tokens is not None:
+            body["max_tokens"] = max_output_tokens
         attempts = self.response_retries + 1
         last_error: Exception | None = None
         for attempt in range(attempts):
