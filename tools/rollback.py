@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 from connectors.ssh_connector import SSHConnector
+from config import MySQLSettings
 from models import BackupRecord
 from tools.restart_db import restart_db
 
@@ -30,8 +31,9 @@ def rollback_db_config(
     *,
     service_name: str,
     restart_required: bool,
+    mysql_settings: MySQLSettings | None = None,
 ) -> None:
     content = connector.read_file(backup.backup_path)
     connector.write_file(backup.config_path, content, sudo=True)
     if restart_required:
-        restart_db(connector, service_name)
+        restart_db(connector, service_name, mysql_settings=mysql_settings)

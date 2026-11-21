@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import math
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -11,6 +12,7 @@ from typing import Any
 from config import AppConfig, KnobSpec, MySQLSettings
 from connectors.mysql_connector import MySQLConnector
 from connectors.ssh_connector import SSHConnector
+from connectors.local_connector import LocalConnector
 from dbms_policy import PROTECTED_KNOBS, enforce_dbms_only
 from tools.apply_db_config import apply_db_config, _format_mysql_sql_value
 from tools.restart_db import restart_db
@@ -46,6 +48,7 @@ class AgenticDBExecutor:
         self, app: AppConfig, space: Space, objective: Objective, run_dir: Path,
         *, allow_mutations: bool = False, allow_restart: bool = False,
         max_p95_ms: float = 1000,
+        local: bool = False,
         connector: SSHConnector | None = None, db: MySQLConnector | None = None,
     ):
         if not isinstance(app.target.active_db_settings, MySQLSettings):
@@ -66,9 +69,10 @@ class AgenticDBExecutor:
             raise ValueError("An explicit absolute MySQL config path is required")
         self.allow_mutations, self.allow_restart, self.max_p95_ms = allow_mutations, allow_restart, max_p95_ms
         self.simulated = app.dry_run
-        self.connector = connector or SSHConnector(
+        self.connector = connector or (LocalConnector if local else SSHConnector)(
             app.target.ssh, config_path=self.settings.config_path,
             dbms="mysql", dry_run=app.dry_run,
+            sudo_password=os.getenv("AGENTICDB_SUDO_PASSWORD"),
         )
         self.db = db or MySQLConnector(self.connector, self.settings, dry_run=app.dry_run)
         self.specs = {
@@ -143,6 +147,12 @@ class AgenticDBExecutor:
         if not self.db.is_alive():
             raise ValueError("MySQL health check failed")
         version = self.db.get_version()
+        if self.settings.service_manager not in {"systemd", "process"}:
+            raise ValueError("未知 MySQL 服务管理方式")
+        if self.settings.service_manager == "process":
+            actual = self.db.show_variables(["socket", "pid_file"])
+            if actual != {"socket": self.settings.socket_path, "pid_file": self.settings.pid_file}:
+                raise ValueError("连接到的 MySQL 与指定进程的 socket/PID 路径不匹配")
         if self.app.target.db_version and version.split("-")[0] != self.app.target.db_version:
             raise ValueError(f"Database version mismatch: expected {self.app.target.db_version}, got {version}")
         resources = self.db.show_variables(sorted(RESOURCE_KNOBS))
@@ -202,7 +212,7 @@ class AgenticDBExecutor:
             if needs_restart:
                 if not self.allow_restart:
                     raise RecoveryFailed("Recovery needs a service restart, but restart permission was not granted")
-                restart_db(self.connector, self.settings.service_name)
+                restart_db(self.connector, self.settings.service_name, mysql_settings=self.settings)
             for name, value in snapshot.config.items():
                 if not self.space.knobs[name].restart_required:
                     self.db.execute(f"SET GLOBAL {name} = {_format_mysql_sql_value(value)};")
@@ -248,7 +258,7 @@ class AgenticDBExecutor:
                     candidate_config=delta, knob_specs=self.specs,
                 )
                 if any(self.space.knobs[n].restart_required for n in delta):
-                    restart_db(self.connector, self.settings.service_name)
+                    restart_db(self.connector, self.settings.service_name, mysql_settings=self.settings)
             self._verify(config, before.invariants)
             result = run_benchmark(self.connector, self.app.benchmark, self.settings, dry_run=self.app.dry_run)
             (self.run_dir / f"benchmark-{self.counter}.log").write_text(result.raw_output)

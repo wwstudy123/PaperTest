@@ -103,6 +103,7 @@ def main() -> int:
     parser.add_argument("--llm-calls", type=int, default=16)
     parser.add_argument("--llm-tokens", type=int, default=60000)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--local", action="store_true", help="在专用 Linux 实例本地执行，不使用 SSH")
     args = parser.parse_args()
     if args.command != "preflight" and not args.dedicated_instance:
         parser.error("Live measurements require --dedicated-instance; never use production.")
@@ -131,6 +132,7 @@ def main() -> int:
         app, space, Objective(), args.output,
         allow_mutations=args.command != "preflight", allow_restart=args.allow_restart,
         max_p95_ms=float(extra.get("max_p95_ms", 1000)),
+        local=args.local,
     )
     result = {}
     started = time.monotonic()
@@ -151,6 +153,7 @@ def main() -> int:
             manifest = {
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "simulated": False, "command": args.command, "backend": args.backend,
+                "execution_mode": "local" if args.local else "ssh",
                 "seed": args.seed, "environment": asdict(environment),
                 "space": space.describe(), "fixed_resource_context": space.fixed_resources,
                 "benchmark": asdict(app.benchmark),

@@ -1029,8 +1029,7 @@ def attempt_db_restart_repair(
             connector,
             backup,
             service_name=db_settings.service_name,
-            restart_required=True,
-        )
+            restart_required=True, mysql_settings=db_settings if isinstance(db_settings, MySQLSettings) else None)
         return RepairOutcome(
             repaired=False,
             restored_backup=True,
@@ -1100,8 +1099,7 @@ def attempt_db_restart_repair(
                 connector,
                 backup,
                 service_name=db_settings.service_name,
-                restart_required=True,
-            )
+                restart_required=True, mysql_settings=db_settings if isinstance(db_settings, MySQLSettings) else None)
             attempt_record["decision"] = "restored_backup"
             attempts.append(attempt_record)
             return RepairOutcome(
@@ -1147,7 +1145,7 @@ def attempt_db_restart_repair(
                 "repair_apply_db_config",
                 {"attempt_id": attempt_id, "apply_report": apply_report},
             )
-            restart_db(connector, db_settings.service_name)
+            restart_db(connector, db_settings.service_name, mysql_settings=db_settings if isinstance(db_settings, MySQLSettings) else None)
             if not db.is_alive():
                 raise RuntimeError(f"{app_config.target.dbms} health check failed after repair restart.")
             working_config.update(validation.normalized_config)
@@ -1170,8 +1168,7 @@ def attempt_db_restart_repair(
         connector,
         backup,
         service_name=db_settings.service_name,
-        restart_required=True,
-    )
+        restart_required=True, mysql_settings=db_settings if isinstance(db_settings, MySQLSettings) else None)
     return RepairOutcome(
         repaired=False,
         restored_backup=True,
@@ -1977,7 +1974,7 @@ def run_agenticdb(
 
                         if not restart_completed:
                             try:
-                                restart_db(connector, db_settings.service_name)
+                                restart_db(connector, db_settings.service_name, mysql_settings=db_settings if isinstance(db_settings, MySQLSettings) else None)
                                 restart_completed = True
                             except Exception as restart_error:
                                 repair_outcome = attempt_db_restart_repair(
@@ -2103,8 +2100,7 @@ def run_agenticdb(
                             connector,
                             backup,
                             service_name=db_settings.service_name,
-                            restart_required=restart_required or bool(apply_report.get("runtime_applied_keys")),
-                        )
+                            restart_required=restart_required or bool(apply_report.get("runtime_applied_keys")), mysql_settings=db_settings if isinstance(db_settings, MySQLSettings) else None)
                         memory.save_round(
                             profile_key,
                             round_id=round_id,
@@ -2124,8 +2120,7 @@ def run_agenticdb(
                         connector,
                         backup,
                         service_name=db_settings.service_name,
-                        restart_required=restart_required or bool(apply_report.get("runtime_applied_keys")),
-                    )
+                        restart_required=restart_required or bool(apply_report.get("runtime_applied_keys")), mysql_settings=db_settings if isinstance(db_settings, MySQLSettings) else None)
                     memory.save_round(
                         profile_key,
                         round_id=round_id,

@@ -463,6 +463,8 @@ class SSHConnector:
         self.run(f"cp {shlex.quote(source_path)} {shlex.quote(target_path)}", sudo=sudo, check=True)
 
     def _wrap_sudo(self, command: str) -> str:
+        if os.getenv(self.settings.target_user_env) == "root":
+            return command
         quoted_command = shlex.quote(command)
         if self.sudo_password:
             quoted_password = shlex.quote(self.sudo_password)

@@ -1,7 +1,6 @@
 # 专用 MySQL 实例预检与首轮实验
 
-本阶段提供真实执行适配器和显式命令，但开发过程中没有连接任何数据库、
-没有调用付费 API。模拟连接器测试不能代替服务器验证。
+本阶段提供真实执行适配器和显式命令。自动化回归不连接真实数据库、不调用付费 API；服务器上的部署验证单独记录。模拟连接器测试不能代替服务器验证。
 
 ## 0 前置检查
 
@@ -16,6 +15,30 @@
 - 不使用平台会显著降配 CPU/内存的无卡模式运行压测。
 
 ## 1 安装与配置
+
+### 容器内本地运行
+
+在数据库所在的专用 Linux 实例执行时，为 `admtune.live` 增加 `--local`，
+无需填写 SSH 密码。root 直接读写该实验实例的配置，不依赖 sudo；非 root
+仍需明确的文件权限或 sudo 权限。
+
+没有 systemd 的容器可在目标文件的 `mysql` 段设置：
+
+```yaml
+service_manager: process
+mysqld_path: /实验目录/mysql/bin/mysqld
+mysqladmin_path: /实验目录/mysql/bin/mysqladmin
+socket_path: /实验目录/mysql.sock
+pid_file: /实验目录/mysql.pid
+startup_timeout_s: 120
+```
+
+这些必须是对应专用实例的绝对路径。预检核对实际 socket 和 PID 路径；
+重启前再次核对 PID 的完整启动参数，只关闭该实例，不按进程名批量杀进程。
+服务重启仍然需要 `--allow-restart`。这是数据库生命周期管理，不是系统参数调优。
+
+建议数据、MySQL 二进制和大体积产物放在数据盘，代码目录保持独立。
+容器中 `free`、`nproc` 可能显示宿主机资源，正式记录应核对 cgroup 配额。
 
 ```sh
 python3 -m venv .venv

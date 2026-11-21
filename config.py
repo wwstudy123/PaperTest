@@ -293,6 +293,12 @@ class MySQLSettings:
     error_log_path: str | None = None
     validate_config_command: str | None = None
     metrics_whitelist_path: str | None = None
+    service_manager: str = "systemd"
+    mysqld_path: str | None = None
+    mysqladmin_path: str = "mysqladmin"
+    socket_path: str | None = None
+    pid_file: str | None = None
+    startup_timeout_s: int = 120
 
 
 @dataclass(slots=True)
@@ -607,6 +613,12 @@ def _load_mysql_settings(block: dict[str, Any]) -> MySQLSettings:
         error_log_path=block.get("error_log_path"),
         validate_config_command=block.get("validate_config_command"),
         metrics_whitelist_path=block.get("metrics_whitelist_path"),
+        service_manager=block.get("service_manager", "systemd"),
+        mysqld_path=block.get("mysqld_path"),
+        mysqladmin_path=block.get("mysqladmin_path", "mysqladmin"),
+        socket_path=block.get("socket_path"),
+        pid_file=block.get("pid_file"),
+        startup_timeout_s=int(block.get("startup_timeout_s", 120)),
     )
 
 

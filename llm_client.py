@@ -71,6 +71,7 @@ class LLMClient:
     last_usage: dict[str, Any] | None = None
     last_retry_events: list[dict[str, Any]] = field(default_factory=list)
     usage_records: list[dict[str, Any]] = field(default_factory=list)
+    enable_thinking: bool | None = None
 
     @classmethod
     def from_env(cls, *, dry_run: bool) -> "LLMClient":
@@ -85,6 +86,10 @@ class LLMClient:
             retry_initial_delay_s=max(0.0, _safe_float(os.getenv("OPENAI_RETRY_INITIAL_DELAY_S"), 10.0)),
             retry_max_delay_s=max(1.0, _safe_float(os.getenv("OPENAI_RETRY_MAX_DELAY_S"), 180.0)),
             retry_status_codes=_parse_status_codes(os.getenv("OPENAI_RETRY_STATUS_CODES")),
+            enable_thinking=(
+                os.getenv("OPENAI_ENABLE_THINKING", "").lower() in {"1", "true", "yes"}
+                if os.getenv("OPENAI_ENABLE_THINKING", "").strip() else None
+            ),
         )
 
     def _fallback_or_raise(self, reason: str, fallback: Callable[[], Any]) -> Any:
@@ -204,6 +209,8 @@ class LLMClient:
         }
         if max_output_tokens is not None:
             body["max_tokens"] = max_output_tokens
+        if self.enable_thinking is not None:
+            body["enable_thinking"] = self.enable_thinking
         attempts = self.response_retries + 1
         last_error: Exception | None = None
         for attempt in range(attempts):
