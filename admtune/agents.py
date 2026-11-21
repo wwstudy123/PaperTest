@@ -117,6 +117,9 @@ class AgenticDBBackend:
             result = self.client._call_openai_compatible(
                 text, operation=f"admtune_{role}", system_prompt=PROMPTS[role],
                 max_output_tokens=self.max_output_tokens,
+                timeout_s=max(1, min(self.client.timeout_s, int(
+                    self.ledger.remaining_seconds() - self.ledger.limits.recovery_reserve_seconds
+                ))),
             )
         finally:
             usage = self.client.consume_last_usage()
@@ -133,10 +136,13 @@ class Team:
         self.batch_size, self.max_selected = batch_size, max_selected
         self.selected: list[str] = []
         self.ranges: dict = {}
+        self.generation = 0
+        self.feedback: dict = {}
 
     def initialize(self, context: list[float], experiences: list[dict]):
         payload = {"catalog": self.space.describe(), "context": context,
-                   "experiences": experiences[:5], "max_selected": self.max_selected}
+                   "experiences": experiences[:5], "max_selected": self.max_selected,
+                   "feedback": self.feedback}
         selected = self.backend.complete("selector", payload).get("selected")
         if (
             not isinstance(selected, list) or not selected or len(set(selected)) != len(selected)
@@ -176,10 +182,12 @@ class Team:
         }
 
     def recommend(self, parent: dict, phase_id: str, context: list[float], experiences: list[dict]) -> list[Candidate]:
+        self.generation += 1
         output = self.backend.complete("recommender", {
             "catalog": self.space.describe(), "selected": self.selected, "ranges": self.ranges,
             "parent": parent, "context": context, "experiences": experiences[:5],
             "batch_size": self.batch_size,
+            "generation": self.generation, "feedback": self.feedback,
         })
         deltas = output.get("candidates")
         if not isinstance(deltas, list) or not 1 <= len(deltas) <= self.batch_size:

@@ -391,6 +391,7 @@ class WorkloadSettings:
     output_path: str | None = None
     env: dict[str, str] = field(default_factory=dict)
     prompt_files: list[str] = field(default_factory=list)
+    rand_seed: int = 42
 
 
 @dataclass(slots=True)
@@ -708,6 +709,7 @@ def _load_workload_config(raw: dict[str, Any], target: TargetConfig) -> Workload
             output_path=workload_block.get("output_path"),
             env={str(k): str(v) for k, v in dict(workload_block.get("env", {})).items()},
             prompt_files=_load_prompt_files(raw, workload_block),
+            rand_seed=int(workload_block.get("rand_seed", 42)),
         )
 
     sysbench_block = raw["sysbench"]
@@ -738,6 +740,7 @@ def _load_workload_config(raw: dict[str, Any], target: TargetConfig) -> Workload
         host=str(sysbench_block.get("host", sysbench_block.get("mysql_host", default_host))),
         port=int(sysbench_block.get("port", sysbench_block.get("mysql_port", default_port))),
         prompt_files=_load_prompt_files(raw, sysbench_block),
+        rand_seed=int(sysbench_block.get("rand_seed", 42)),
     )
 
 

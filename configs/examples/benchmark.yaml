@@ -1,0 +1,19 @@
+workload:
+  kind: sysbench
+  mode: readwrite
+  db_driver: mysql
+  script_path: /usr/share/sysbench/oltp_read_write.lua
+  database: sbtest
+  tables: 50
+  table_size: 1000000
+  threads: 32
+  duration: 120
+  warmup_time: 30
+  report_interval: 5
+  rand_seed: 42
+objective:
+  primary_metric: tps
+  direction: maximize
+  formula: tps
+  latency_metric: p95_latency_ms
+  min_improvement_ratio: 0.01

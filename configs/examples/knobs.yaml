@@ -1,0 +1,34 @@
+# Illustrative fixed search universe; verify bounds/defaults against the server.
+# Durability, isolation, logging and instrumentation knobs are deliberately absent.
+innodb_buffer_pool_size:
+  type: integer
+  default: 4294967296
+  min: 134217728
+  max: 17179869184
+  step: 134217728
+  unit: bytes
+  log_scale: true
+  restart_required: false
+innodb_io_capacity:
+  type: integer
+  default: 200
+  min: 100
+  max: 2000
+  step: 100
+  restart_required: false
+innodb_io_capacity_max:
+  type: integer
+  default: 2000
+  min: 2000
+  max: 6000
+  step: 500
+  restart_required: false
+sort_buffer_size:
+  type: integer
+  default: 262144
+  min: 262144
+  max: 8388608
+  step: 262144
+  unit: bytes
+  log_scale: true
+  restart_required: false

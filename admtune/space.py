@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -24,6 +25,8 @@ class Knob:
     description: str = ""
 
     def __post_init__(self):
+        if not re.fullmatch(r"[a-z][a-z0-9_]*", self.name):
+            raise ValueError("Use explicit SQL-safe DBMS variable names")
         enforce_dbms_only("db_config", {self.name: self.default})
         if self.kind not in {"integer", "float", "enum", "boolean"}:
             raise ValueError(f"Unsupported type: {self.kind}")
@@ -39,7 +42,7 @@ class Knob:
         self.validate(self.default)
 
     def validate(self, value: Any) -> Any:
-        if value in self.special and type(value) in {int, float, str, bool}:
+        if any(type(value) is type(v) and value == v for v in self.special):
             return value
         if self.kind in {"enum", "boolean"}:
             if not any(type(value) is type(v) and value == v for v in self.choices):

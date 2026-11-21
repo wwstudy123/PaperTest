@@ -23,8 +23,8 @@ class Policy:
     tolerated_drop: float = 0.1
     min_gain: float = 0.01
     bootstrap: int = 4
-    max_batches: int = 6
-    max_replans: int = 2
+    max_batches: int = 3
+    max_replans: int = 1
     max_training: int = 64
     history_distance: float = 4.0
     surrogate_gate: bool = True
@@ -109,19 +109,24 @@ class Controller:
             self.gp.fitted = False
         if state.event != "phase_ready":
             return state
-        self.phase_id = state.phase_id
+        self.begin_phase(state.phase_id, state.context)
+        return state
+
+    def begin_phase(self, phase_id: str, context: list[float]):
+        """Initialize a measured phase; static mode explicitly supplies constant context."""
+        self.phase_id = phase_id
+        self.last_context = list(context)
         self.replans = self.no_gain = 0
-        baseline = self.trial(self.current, state.context, kind="baseline")
+        baseline = self.trial(self.current, context, kind="baseline")
         if not baseline.trainable or not baseline.constraints_ok:
             self.active = False
             self.store.event("stage_stopped", {"reason": "Baseline invalid or violates constraints"})
-            return state
+            return
         self.baseline = self.best_value = baseline.value
         self.best_config = dict(self.current)
-        self.team.initialize(state.context, self.experiences(state.context))
+        self.team.initialize(context, self.experiences(context))
         self.active = True
         self.gp.fitted = False
-        return state
 
     def trial(self, config: dict, context: list[float], *, kind: str, prediction: Prediction | None = None) -> Trial:
         self.ledger.charge_trial(kind, self.executor.estimated_trial_seconds)
@@ -171,6 +176,9 @@ class Controller:
         return record
 
     def fit(self, context: list[float]):
+        if not self.policy.surrogate_gate:
+            self.gp.fitted = False
+            return
         history = self.histories(context)
         if len(history) < self.policy.bootstrap:
             self.gp.fitted = False
@@ -192,6 +200,7 @@ class Controller:
             candidates = self.team.recommend(self.best_config, self.phase_id, z, self.experiences(z))
             candidates = [c for c in candidates if (self.phase_id, c.key) not in self.seen]
             if not candidates:
+                self.team.feedback = {"reason": "Candidates were invalid, duplicate, or unchanged; resample."}
                 continue
             predictions = None
             # Startup neighbors are permitted only in the dedicated test executor.
@@ -208,6 +217,14 @@ class Controller:
                     "predictions": [asdict(p) for p in predictions], "eligible": eligible,
                 })
                 if not eligible:
+                    self.team.feedback = {
+                        "reason": "No candidate met LCB admission and UCB improvement conditions.",
+                        "log_admission_floor": floor, "log_improvement_floor": gain_floor,
+                        "evaluations": [
+                            {"config": c.config, **asdict(p)}
+                            for c, p in zip(candidates[:4], predictions[:4])
+                        ],
+                    }
                     continue
                 index = max(eligible, key=lambda i: predictions[i].upper(self.policy.beta))
             else:
@@ -215,6 +232,11 @@ class Controller:
             prediction = predictions[index] if predictions else None
             kind = "startup" if self.policy.surrogate_gate and not self.gp.fitted else "candidate"
             record = self.trial(candidates[index].config, z, kind=kind, prediction=prediction)
+            self.team.feedback = {
+                "reason": "Measured feedback, not a causal explanation.",
+                "trial_id": record.trial_id, "status": record.status, "value": record.value,
+                "accepted": record.metadata.get("accepted", False),
+            }
             events = []
             if record.trainable:
                 if prediction:

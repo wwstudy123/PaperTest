@@ -66,6 +66,7 @@ def _run_sysbench(
         f"--db-driver={shlex.quote(workload.db_driver or ('mysql' if isinstance(db_settings, MySQLSettings) else 'pgsql'))}",
         f"--threads={workload.threads}",
         f"--report-interval={workload.report_interval}",
+        f"--rand-seed={workload.rand_seed}",
     ]
     if workload.tables:
         common.append(f"--tables={workload.tables}")

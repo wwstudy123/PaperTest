@@ -1,0 +1,38 @@
+target:
+  dbms: mysql
+  db_version: "8.0.36"
+  workload: sysbench_readwrite
+  hardware:
+    memory: 32GB
+    cpu: "REPLACE_WITH_ALLOCATED_CPU"
+ssh:
+  use_jump_host: false
+  target_host_env: ADMTUNE_SSH_HOST
+  target_port_env: ADMTUNE_SSH_PORT
+  target_user_env: ADMTUNE_SSH_USER
+  target_password_env: ADMTUNE_SSH_PASSWORD
+mysql:
+  config_path: /etc/my8.cnf
+  service_name: mysql
+  mysql_user: root
+  mysql_password_env: ADMTUNE_MYSQL_PASSWORD
+  host: 127.0.0.1
+  port: 3306
+  database: sbtest
+safety:
+  dry_run_default: true
+  require_validation_before_apply: true
+  always_backup_before_apply: true
+  rollback_on_restart_failure: true
+  rollback_on_benchmark_regression: true
+  auto_repair_on_restart_failure: false
+  max_repair_attempts: 0
+auditor:
+  dbms_only: true
+  initial_phase: db
+admtune:
+  # Replace these IDs with the actual dedicated instance and initial data snapshot.
+  hardware_id: REPLACE_WITH_DEDICATED_INSTANCE_ID
+  data_id: REPLACE_WITH_INITIAL_DATA_SNAPSHOT_ID
+  schema_id: sysbench_50_tables_v1
+  max_p95_ms: 1000

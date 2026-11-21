@@ -1,0 +1,112 @@
+# 专用 MySQL 实例预检与首轮实验
+
+本阶段提供真实执行适配器和显式命令，但开发过程中没有连接任何数据库、
+没有调用付费 API。Fake connector 测试不能代替服务器验证。
+
+## 0 前置检查
+
+- 只允许使用可恢复的专用实验实例，禁止生产库。
+- 固定 MySQL 8.0.36、数据规模、数据快照、硬件分配和物理设计。
+- 确认实际 MySQL 服务名和启动使用的配置文件。`/etc/my8.cnf` 只是来自
+  已有环境的示例，文件存在不等于服务确实读取它。
+- 当前实机适配器只验证 Sysbench TPS；P95 是独立约束，不采用 TPS/P95。
+- OS 参数不会被写入。重启默认禁止，需要 `--allow-restart` 明确授权。
+- 当前不会自动重建或还原数据库数据快照。每次独立重复前由操作者还原，
+  并把快照编号写入配置。读写负载会改变数据状态。
+- 不使用平台会显著降配 CPU/内存的无卡模式运行压测。
+
+## 1 安装与配置
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m unittest discover -s tests -v
+mkdir -p configs/local
+cp configs/examples/target.yaml configs/local/target.yaml
+cp configs/examples/benchmark.yaml configs/local/benchmark.yaml
+cp configs/examples/knobs.yaml configs/local/knobs.yaml
+cp .env.example .env
+```
+
+填写本地文件：
+
+- `.env`：SSH、MySQL 和（以后才需要的）模型凭证。
+- `target.yaml`：真实服务名、配置文件、分配内存、hardware/data/schema ID。
+- `benchmark.yaml`：已验证的脚本路径、表数、行数、线程和测量协议。
+- `knobs.yaml`：固定可调全集、硬边界、默认值、步长和生效方式。
+
+参数目录是示例，不是对 MySQL 所有版本合法范围的声明。现有参数值必须
+落在该实验的合法空间内，否则预检拒绝开始；不会自动修改基线适配示例。
+示例采用 120 秒测量、30 秒预热、32 线程和固定 Sysbench 随机种子。
+正式实验前通过独立校准确认这些时长和 P95 阈值。
+
+这三个本地 YAML 和 `.env` 都被 Git 忽略。不要把密码发到聊天或提交仓库。
+
+## 2 只做预检
+
+```sh
+.venv/bin/python -m admtune.live preflight \
+  --target configs/local/target.yaml \
+  --benchmark configs/local/benchmark.yaml \
+  --knobs configs/local/knobs.yaml \
+  --output runs/preflight-001
+```
+
+预检读取版本、当前参数、持久性/隔离/观测不变量、表数、schema 指纹、
+Sysbench 版本和服务器标识。不应用参数、不重启、不执行压测、不调用 LLM。
+上游 SSH 的 sudo 文件读取可能创建临时读副本，不写数据库或 OS 配置。
+服务的完整启动参数、容器资源隔离和数据内容一致性仍需人工核实。
+
+## 3 不用 LLM 的手工 pilot
+
+先不传 delta，仅验证完整基准测量和结束后的恢复：
+
+```sh
+.venv/bin/python -m admtune.live pilot \
+  --target configs/local/target.yaml \
+  --benchmark configs/local/benchmark.yaml \
+  --knobs configs/local/knobs.yaml \
+  --dedicated-instance \
+  --output runs/pilot-baseline-001
+```
+
+然后在 `configs/local/delta.json` 写一项已经人工核验、处于合法边界内的
+小变更，再执行相同命令，增加 `--delta configs/local/delta.json`。
+确认配置文件快照、实际读回、完整测量和初始配置恢复全部成立。
+
+初版不依靠 LLM 修复故障。恢复失败以非零状态停止，保留备份和日志，
+等待人工处理。不能在故障未解决时继续自动试验。
+
+## 4 静态搜索
+
+先以免费启发式 proposer 验证链路（不是 AgentTune，也不是正式 LLM 结果）：
+
+```sh
+.venv/bin/python -m admtune.live tune-static \
+  --target configs/local/target.yaml \
+  --benchmark configs/local/benchmark.yaml \
+  --knobs configs/local/knobs.yaml \
+  --dedicated-instance --backend heuristic --trials 12 \
+  --output runs/static-smoke-001
+```
+
+基准、启动探测、候选和最终独立复测共享试验槽。失败提交不退还预算。
+默认预留 3 个槽作最终复测。实机输出与合成模拟分开标记。
+每次命令结束恢复初始配置，不自动部署“最佳配置”。
+
+仅当手工 pilot 已通过、模型和预算已确定后，把 backend 改成 `llm`，
+并显式增加 `--allow-paid-llm --llm-calls 16 --llm-tokens 60000`。
+没有 API key/base URL/model 时拒绝启动付费角色。
+禁用隐式重试和启发式降级；相同请求缓存命中不再次计费。
+Token 预算使用保守预留，API 返回 usage 后结算；无法取得 usage 的失败调用
+不免费处理。实际美元成本需补充所选模型的计费表，当前不虚构费用。
+
+## 5 尚未通过的真实实验门槛
+
+- Linux 专用服务器上的实际 baseline/apply/readback/recovery 验证。
+- 独立、外生的 offered-load 采集与 A-B-A 固定回放驱动集成。
+- 真正的 AgentTune 基线和受限 AgenticDB 的同协议正式对比。
+- OLAP 全查询集完整性与超时测量适配器。
+- 正式阈值校准、独立重复、数据状态恢复和统计分析。
+
+不要把离线 A-B-A 测试描述为已经完成了真实动态数据库实验。

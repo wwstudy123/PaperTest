@@ -23,6 +23,17 @@ This is a **synthetic simulation with a heuristic proposer**, not a MySQL
 experiment and not an LLM evaluation. No API key, GPU or live DB is needed.
 See [`docs/OFFLINE.md`](docs/OFFLINE.md) for variants and numerical contracts.
 
+## Dedicated MySQL execution gate
+
+[`docs/LIVE_RUNBOOK.md`](docs/LIVE_RUNBOOK.md) documents the explicit
+`admtune.live preflight`, `pilot`, and `tune-static` commands, ignored local
+configuration files and opt-in paid LLM calls. Real measurements require
+`--dedicated-instance`; service restarts require an additional permission.
+Real dynamic replay and OLAP are not yet claimed as implemented or validated.
+
+**The inherited `agenticdb` command below is upstream reference, not the
+ADMTune entry point.** Use `--dbms-only` when evaluating its restricted baseline.
+
 ## Upstream AgenticDB reference
 
 Core implementation for the AgenticDB paper.

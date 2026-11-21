@@ -22,6 +22,7 @@ dependencies = [
 [project.scripts]
 agenticdb = "main:main"
 admtune = "admtune.cli:main"
+admtune-live = "admtune.live:main"
 
 [tool.setuptools]
 py-modules = [
