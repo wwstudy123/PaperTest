@@ -1,4 +1,16 @@
-# AgenticDB
+# ADMTune on AgenticDB
+
+ADMTune is being developed incrementally on the AgenticDB execution artifact.
+The upstream source and MIT license are retained. **No real database results
+or LLM performance claims have been produced by this fork yet.**
+
+The implementation plan and safety boundaries are in
+[`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md).
+Deployment credentials belong in ignored `configs/local/` or environment
+variables, never in committed examples. Generated runs and database backups
+are ignored by Git.
+
+## Upstream AgenticDB reference
 
 Core implementation for the AgenticDB paper.
 
