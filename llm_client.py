@@ -188,6 +188,8 @@ class LLMClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if "json" not in system_prompt.lower():
+            system_prompt += "\n只返回一个合法的 JSON 对象。"
         messages = [
             {
                 "role": "system",
@@ -217,7 +219,15 @@ class LLMClient:
             try:
                 start = time.perf_counter()
                 response = requests.post(url, headers=headers, json=body, timeout=timeout_s or self.timeout_s)
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except requests.HTTPError as exc:
+                    detail = response.text[:1500]
+                    if self.api_key:
+                        detail = detail.replace(self.api_key, "<redacted>")
+                    raise requests.HTTPError(
+                        f"模型接口 HTTP {response.status_code}: {detail}", response=response,
+                    ) from exc
                 response.encoding = "utf-8"
                 data = response.json()
                 duration_s = round(time.perf_counter() - start, 4)

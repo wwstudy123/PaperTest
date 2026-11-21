@@ -1,3 +1,3 @@
 """ADMTune: guarded DBMS-only workload-aware experimentation."""
 
-__version__ = "0.4.1"
+__version__ = "0.4.2"

@@ -23,7 +23,7 @@ PROMPTS = {
         "你负责建议优先搜索范围。selected 中每个参数必须且只能出现一次。硬边界与步长不能改变。"
         "数值上下界必须位于 catalog 边界内，且与 lower 加整数倍 step 对齐；单位沿用目录，"
         "字节值必须输出数字，不能输出 GB 等字符串。枚举值只能来自目录。"
-        '仅返回 {"ranges":{"参数名":{"lower":数值或null,"upper":数值或null,"choices":[],"special":[]}}}。'
+        '仅返回一个 JSON 对象：{"ranges":{"参数名":{"lower":数值或null,"upper":数值或null,"choices":[],"special":[]}}}。'
         "每项严格保留这四个字段；数值参数的 choices 为空数组，枚举参数的 lower/upper 为 null。"
         "special 只能选目录中已有的特殊值。不要增加 step、解释或其他字段。"
     ),
@@ -32,11 +32,11 @@ PROMPTS = {
         "仅使用 selected 参数与 ranges 范围，严格遵循 catalog 的类型、特殊值和步长。"
         "未改参数继承父配置；每个候选至少一项实际变化，候选之间不同。"
         "结合 feedback 避免重复被拒绝的配置。历史只证明观测到的组合效果，不是因果规律。"
-        '仅返回 {"candidates":[{"参数名":具体数值或枚举值}]}。'
+        '仅返回一个 JSON 对象：{"candidates":[{"参数名":具体数值或枚举值}]}。'
         "每项直接是变更字典，不嵌套 config，不增加说明字段，不虚构实测收益。"
     ),
     "reflection": (
-        "你负责归纳新增执行证据，旧摘要只作背景。仅输出 facts、hypotheses、conditions、actions、"
+        "你负责归纳新增执行证据，旧摘要只作背景。仅输出一个 JSON 对象，含 facts、hypotheses、conditions、actions、"
         "evidence_ids 五个字段。facts 必须完整复制输入 facts 的 trial_id/status/value，"
         "不得遗漏、修改数字、改变状态或添加文字事实。conditions 原样复制输入条件。"
         "hypotheses 是待验证解释的字符串数组，不是确定性规则。"
