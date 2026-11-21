@@ -916,6 +916,7 @@ def load_app_config(
     os_controls = _read_os_controls(os_controls_path) if os_controls_path is not None and os_controls_path.exists() else {}
     os_metric_keys = list(dict.fromkeys([*os_knobs.keys(), *target.os.metric_keys]))
     auditor = AuditorSettings(
+        dbms_only=bool(auditor_block.get("dbms_only", False)),
         enabled=bool(auditor_block.get("enabled", True)),
         initial_phase=_normalize_auditor_phase(auditor_block.get("initial_phase", "db")),
         min_db_rounds=int(auditor_block.get("min_db_rounds", 5)),

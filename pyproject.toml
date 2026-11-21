@@ -23,6 +23,7 @@ agenticdb = "main:main"
 py-modules = [
   "auditor",
   "config",
+  "dbms_policy",
   "expert_candidates",
   "knob_selector",
   "llm_client",

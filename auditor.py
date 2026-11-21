@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass, replace
 from typing import Any
 
 from models import BenchmarkResult
@@ -18,6 +18,7 @@ TUNING_PHASES = {DB_PHASE, OS_SYSCTL_PHASE, OS_CONTROL_PHASE}
 
 @dataclass(slots=True)
 class AuditorSettings:
+    dbms_only: bool = False
     enabled: bool = True
     initial_phase: str = DB_PHASE
     min_db_rounds: int = 5
@@ -172,7 +173,9 @@ def build_os_control_space(
     return payload
 
 
-def allowed_actions_for_phase(phase: str) -> set[str]:
+def allowed_actions_for_phase(phase: str, *, dbms_only: bool = False) -> set[str]:
+    if dbms_only:
+        return {"db_config", "repeat_benchmark"} if phase == DB_PHASE else set()
     if phase in {OS_SYSCTL_PHASE, LEGACY_OS_PHASE}:
         return {"os_config", "repeat_benchmark"}
     if phase == OS_CONTROL_PHASE:
@@ -185,6 +188,38 @@ class TuningAuditor:
         self.settings = settings
 
     def audit(
+        self,
+        *,
+        rounds: list[dict[str, Any]],
+        current_phase: str,
+        best_result: BenchmarkResult,
+        workload_interpretation: dict[str, Any] | None = None,
+    ) -> AuditDecision:
+        if self.settings.dbms_only and current_phase != DB_PHASE:
+            return AuditDecision(
+                current_phase=current_phase,
+                next_phase=STOP_PHASE,
+                action="stop",
+                reason="DBMS-only policy rejects non-database tuning phases.",
+                stop=True,
+            )
+        decision = self._audit(
+            rounds=rounds,
+            current_phase=current_phase,
+            best_result=best_result,
+            workload_interpretation=workload_interpretation,
+        )
+        if self.settings.dbms_only and decision.next_phase not in {DB_PHASE, STOP_PHASE}:
+            return replace(
+                decision,
+                next_phase=STOP_PHASE,
+                action="stop",
+                stop=True,
+                reason="DBMS-only search reached its stop condition; OS exploration is disabled.",
+            )
+        return decision
+
+    def _audit(
         self,
         *,
         rounds: list[dict[str, Any]],

@@ -39,6 +39,13 @@ user repository. A failed push is reported; it is never described as synchronize
 Paid LLM calls and live database mutations require an explicit run command and are
 not performed during implementation.
 
+## Stage 1 baseline restriction
+
+`agenticdb --dbms-only ...` restricts the inherited baseline to database actions.
+The auditor stops rather than switching to OS tuning. Deterministic proposal and
+repair checks reject durability, isolation and instrumentation changes. This
+restricted method must be labeled separately from full upstream AgenticDB.
+
 ## Evaluation boundaries
 
 - Keep upstream AgenticDB available for provenance; its original entry point is

@@ -22,6 +22,7 @@ from auditor import (
     build_os_knob_space,
 )
 from config import AppConfig, KnobSpec, MySQLSettings, PostgreSQLSettings
+from dbms_policy import enforce_dbms_only
 from connectors.mysql_connector import MySQLConnector
 from connectors.postgres_connector import PostgreSQLConnector
 from connectors.ssh_connector import SSHConnector
@@ -178,6 +179,7 @@ def _compact_db_runtime_for_prompt(db_runtime: dict[str, Any]) -> dict[str, Any]
 def build_prompt(
     *,
     skill_text: str,
+    dbms_only: bool = False,
     os_metrics: dict[str, Any],
     db_metrics: dict[str, Any],
     current_config: dict[str, Any],
@@ -269,7 +271,7 @@ def build_prompt(
         "task_round_id": round_id,
         "target_profile": prompt_profile_context,
         "current_phase": current_phase,
-        "allowed_action_types": sorted(allowed_actions_for_phase(current_phase)),
+        "allowed_action_types": sorted(allowed_actions_for_phase(current_phase, dbms_only=dbms_only)),
         "auditor_state": audit_decision.to_dict(),
         "os_metrics": os_metrics,
         "db_metrics": db_metrics,
@@ -402,6 +404,30 @@ def build_prompt(
         "tuning_history_summary": tuning_history_summary,
         "workload_memory_book": workload_memory_summary,
     }
+    if dbms_only:
+        rendered_prompt = (
+            "You are the AgenticDB-DBMS-only database planner. Propose one db_config "
+            "or repeat_benchmark action in the existing schema. OS writes and OS phase "
+            "transitions are forbidden. Preserve durability, consistency and observability. "
+            "Return a candidate_config within the supplied database knob space, diagnosis, "
+            "restart_required, expected_effect, risk, validation_required, and an "
+            "auditor_recommendation with next_phase=db or stop."
+        )
+        for key in (
+            "os_config_contract", "os_control_contract", "legacy_candidate_config_contract_note",
+            "allowed_os_knob_space", "allowed_os_control_space",
+        ):
+            payload.pop(key, None)
+        payload["allowed_os_knob_count"] = 0
+        payload["allowed_os_control_count"] = 0
+        payload["benchmark_max_policy"] = {"enabled": False}
+        payload["candidate_config_contract"] = (
+            "Propose database knobs only. Do not change durability, consistency, "
+            "instrumentation, benchmark client settings, or the optimization objective."
+        )
+        payload["strategy_signal_contract"]["auditor_recommendation"] = (
+            "Recommend next_phase=db or stop only; OS actions are not permitted."
+        )
     if not compact_prompt:
         payload["current_config"] = current_config
     return (
@@ -1483,6 +1509,14 @@ def attempt_db_restart_repair(
             failure_reason = f"Unsupported repair action: {proposal.action_type}"
             continue
 
+        if app_config.auditor.dbms_only:
+            try:
+                enforce_dbms_only(proposal.action_type, proposal.candidate_config)
+            except ValueError as exc:
+                attempt_record["decision"] = "repair_scope_rejected"
+                attempts.append(attempt_record)
+                failure_reason = str(exc)
+                continue
         validation = config_validator.validate(proposal.candidate_config, working_config)
         attempt_record["validation"] = validation.to_dict()
         if not validation.passed:
@@ -1570,6 +1604,8 @@ def run_agenticdb(
     use_history: bool = True,
     use_memory_book: bool = True,
 ) -> dict[str, Any]:
+    if app_config.auditor.dbms_only and app_config.auditor.initial_phase != DB_PHASE:
+        raise ValueError("DBMS-only execution requires initial_phase=db.")
     skill_text = app_config.skill_path.read_text(encoding="utf-8")
     history_path = app_config.history_path if use_history else run_dir / "local_history.json"
     memory = MemoryStore(history_path)
@@ -1952,6 +1988,7 @@ def run_agenticdb(
 
             prompt = build_prompt(
                 skill_text=skill_text,
+                dbms_only=app_config.auditor.dbms_only,
                 os_metrics=os_metrics,
                 db_metrics=db_metrics,
                 current_config=current_config,
@@ -2072,7 +2109,9 @@ def run_agenticdb(
             trace_logger.log_event("proposal", proposal.to_dict())
             logger.info("Round %s proposal: %s", round_id, proposal.action_type)
 
-            phase_allowed_actions = allowed_actions_for_phase(current_phase)
+            phase_allowed_actions = allowed_actions_for_phase(
+                current_phase, dbms_only=app_config.auditor.dbms_only,
+            )
             round_base_metadata = {
                 "phase": current_phase,
                 "auditor": audit_decision.to_dict(),
@@ -2212,6 +2251,16 @@ def run_agenticdb(
                 )
                 continue
 
+            if app_config.auditor.dbms_only:
+                try:
+                    enforce_dbms_only(proposal.action_type, proposal.candidate_config)
+                except ValueError as exc:
+                    trace_logger.log_event("dbms_only_rejected", {"reason": str(exc)})
+                    memory.save_round(
+                        profile_key, round_id=round_id, proposal=proposal, result=None,
+                        decision="rejected", reason=str(exc), metadata=round_metadata(),
+                    )
+                    continue
             safety = safety_guard.validate(proposal.action_type, proposal.candidate_config)
             if not safety.passed:
                 trace_logger.log_event("safety_rejected", safety.to_dict())
