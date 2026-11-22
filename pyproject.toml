@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agenticdb-artifact"
-version = "0.4.2"
+version = "0.5.0"
 description = "ADMTune DBMS-only tuning extensions on the AgenticDB artifact"
 readme = "README.md"
 license = { text = "MIT" }
@@ -19,11 +19,16 @@ dependencies = [
   "requests>=2.32.3",
 ]
 
+[project.optional-dependencies]
+replay = ["PyMySQL[rsa]>=1.1,<2"]
+
 [project.scripts]
 agenticdb = "main:main"
 admtune = "admtune.cli:main"
 admtune-live = "admtune.live:main"
 admtune-experiments = "admtune.experiments:main"
+admtune-replay = "admtune.replay:main"
+admtune-replay-report = "admtune.replay_report:main"
 
 [tool.setuptools]
 py-modules = [

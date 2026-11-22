@@ -37,7 +37,7 @@ python3 -m venv .venv
 
 真实试验必须显式传入 `--dedicated-instance`。数据库服务重启需要额外的 `--allow-restart`。付费模型调用还需要 `--backend llm --allow-paid-llm` 和明确的调用、令牌预算。
 
-真实动态请求采集与回放、完整 OLAP 执行、正式基线对照仍待后续集成，不应将离线测试视为已完成这些实验。
+另提供不调用模型、不修改配置的真实外生 A→B→A 回放入口，见[动态回放与绘图记录](docs/DYNAMIC_REPLAY.md)。该入口只验收到达监测，不是动态调优。动态调优闭环、完整 OLAP 执行和正式基线对照仍待集成。
 
 ## 合成消融矩阵
 

@@ -10,7 +10,7 @@ import subprocess
 def source_provenance() -> dict:
     root = Path(__file__).resolve().parent.parent
     payload = {"python": platform.python_version(), "dependencies": {}}
-    for name in ["numpy", "scipy", "sqlglot", "paramiko", "PyYAML", "requests"]:
+    for name in ["numpy", "scipy", "sqlglot", "paramiko", "PyYAML", "requests", "PyMySQL"]:
         try:
             payload["dependencies"][name] = version(name)
         except PackageNotFoundError:
