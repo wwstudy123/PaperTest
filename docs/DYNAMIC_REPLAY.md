@@ -78,3 +78,13 @@ python -m admtune.replay_report runs/autodl-replay-composition-001
 ```
 
 原始目录和归档保存在 Git 忽略的 `runs/`，不要把 `.env`、私有目标文件和数据库备份打进结果包。公开仓库仅提交脱敏汇总。后续正式实验还要增加动态调优执行、统一数据快照恢复、独立重复、参数空间冻结、竞争方法和消融。
+
+### 既有静态实验的绘图表
+
+静态运行可离线导出，不会再次压测或请求模型：
+
+```sh
+python -m admtune.static_report runs/autodl-llm-smoke-002
+```
+
+生成 `static_trials.csv`（试验序号、角色阶段、目标值、P95、配置、生效与接受状态、试验前对数预测）、`static_llm_usage.csv`（接口已返回的逐次用量）及 `static_verification.csv`（最终三次复测）。不能把复测回填搜索曲线，也不能将未知用量的失败请求误算为免费。

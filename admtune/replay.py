@@ -19,6 +19,7 @@ import yaml
 
 from .contracts import fingerprint
 from .provenance import source_provenance
+from .security import redact
 from .workload import PhaseDetector, TemplateCatalog, Window, WorkloadEncoder
 
 
@@ -302,6 +303,7 @@ def main():
         result = replay(plan, client, args.output, simulated=False)
     except Exception as exc:
         result["error_type"] = type(exc).__name__
+        result["error"] = redact(str(exc))
     finally:
         if client is not None:
             try:
@@ -311,6 +313,7 @@ def main():
                 result["complete"] = result["complete"] and result["configuration_unchanged"]
             except Exception as exc:
                 result["audit_error_type"] = type(exc).__name__
+                result["audit_error"] = redact(str(exc))
                 result["complete"] = False
             try:
                 client.close()
