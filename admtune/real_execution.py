@@ -44,6 +44,8 @@ class Snapshot:
 
 
 class AgenticDBExecutor:
+    measurement_protocol = "sysbench_oltp"
+
     def __init__(
         self, app: AppConfig, space: Space, objective: Objective, run_dir: Path,
         *, allow_mutations: bool = False, allow_restart: bool = False,

@@ -130,7 +130,7 @@ def monitor(plan: ReplayPlan):
                                "note": "预声明联调阈值，非正式校准结果；不读取阶段标签"}
 
 
-def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True) -> dict:
+def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, guard=None) -> dict:
     """execute 只由有界工作线程调用；调度不等待查询完成，过载明确丢弃。"""
     schedule = make_schedule(plan)
     catalog, detector, metadata = monitor(plan)
@@ -173,6 +173,9 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True) -
                 ready.append({"end": w.end, "phase_id": detection.phase_id})
             windows.write(json.dumps({"window": asdict(w), "detection": asdict(detection),
                                       "observed_at": time.monotonic() - started}) + "\n")
+            if guard is not None:
+                # 此回调只更新短小的观测状态；不得在调度线程中执行调参或压测。
+                guard.observe(w, detection)
             windows.flush()
             offered.flush()
             results.flush()
@@ -220,6 +223,9 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True) -
               "replay_started_at_utc": replay_started_at,
               "llm_calls": 0, "configuration_mutations": 0,
               "data_snapshot_restored": False}
+    if guard is not None:
+        result["mode"] = "phase_guard_acceptance_no_tuning"
+        result["phase_guard_passed"] = guard.finish(output, result["complete"])["passed"]
     return result
 
 
@@ -291,16 +297,27 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
     parser.add_argument("--scenario", choices=["composition", "intensity", "steady", "transient"], required=True)
+    parser.add_argument("--phase-seconds", type=int, default=24)
+    parser.add_argument("--guard-acceptance", action="store_true",
+                        help="保持 15+60 秒观测，验收阶段预算及跨阶段拒绝；不调参")
     parser.add_argument("--dedicated-instance", action="store_true")
     args = parser.parse_args()
     if not args.dedicated_instance:
         parser.error("Requires a dedicated experimental database; UPDATE changes data")
+    try:
+        plan = ReplayPlan(scenario=args.scenario, phase_seconds=args.phase_seconds)
+        if args.guard_acceptance:
+            from .phase_safety import GuardAcceptance
+            guard = GuardAcceptance(plan)
+        else:
+            guard = None
+    except ValueError as exc:
+        parser.error(str(exc))
     load_dotenv(args.env_file, override=True)
     target = yaml.safe_load(args.target.read_text())
     settings = target["mysql"]
     if settings.get("host", "127.0.0.1") not in {"127.0.0.1", "localhost"}:
         parser.error("Replay currently requires local MySQL")
-    plan = ReplayPlan(scenario=args.scenario)
     args.output.mkdir(parents=True, exist_ok=False)
     client = None
     result = {"simulated": False, "complete": False}
@@ -316,9 +333,11 @@ def main():
                     "environment_ids": target.get("admtune", {}),
                     "declared_hardware": target.get("target", {}).get("hardware", {}),
                     "request_semantics": "单条 SELECT/UPDATE，autocommit；QPS 不是 Sysbench 事务 TPS",
+                    "phase_guard_acceptance": args.guard_acceptance,
+                    "phase_timing": guard.timing.report() if guard else None,
                     "warning": "Monitor-only low-rate replay, not Sysbench TPS or dynamic tuning"}
         (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2))
-        result = replay(plan, client, args.output, simulated=False)
+        result = replay(plan, client, args.output, simulated=False, guard=guard)
     except Exception as exc:
         result["error_type"] = type(exc).__name__
         result["error"] = redact(str(exc))
@@ -350,7 +369,8 @@ def main():
                 result["complete"] = False
                 (args.output / "summary.json").write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
-    return 0 if result.get("complete") and result.get("detector_matches_plan") else 1
+    return 0 if (result.get("complete") and result.get("detector_matches_plan")
+                 and (not args.guard_acceptance or result.get("phase_guard_passed"))) else 1
 
 
 if __name__ == "__main__":
