@@ -24,6 +24,7 @@ from .contracts import Environment, Objective, fingerprint
 from .controller import Controller, Policy
 from .dynamic_runtime import LiveTelemetry, DetectorView, DynamicExecutor, GenerationalRequests
 from .execution import RecoveryFailed
+from .evidence_wire import EvidenceWireBackend
 from .live import load_space
 from .memory import Store
 from .phase_safety import PhaseFence, PhaseTiming
@@ -197,7 +198,9 @@ class DynamicSession:
                 space=self.space, environment=self.environment, objective=Objective('p95_latency_ms', 'minimize'),
                 detector=DetectorView(self.telemetry), executor=executor,
                 team=PooledTeam(self.space, backend, batch_size=6, max_selected=4),
-                reflector=Reflector(store, backend, max_batch=12, old_summary_limit=0), store=store,
+                reflector=Reflector(store, EvidenceWireBackend(
+                    backend, audit_dir=self.output / 'reflection_maps',
+                ), max_batch=12, old_summary_limit=0), store=store,
                 ledger=ledger, policy=Policy(max_batches=1, max_replans=0, tolerated_drop=.2,
                                             final_repeats=1), seed=self.seed,
                 snapshot_dir=self.output / 'gp_models',
@@ -423,7 +426,9 @@ def main():
                     'environment': asdict(environment), 'seed': args.seed, 'plan': asdict(plan),
                     'phase_timing': timing.report(), 'space': space.describe(), 'preflight': preflight,
                     'constraints_p95_ms': actuator.max_p95_ms, 'actuator_benchmark_not_executed': True,
-                    'data_snapshot_restored': False, **source_provenance()}
+                    'data_snapshot_restored': False,
+                    'reflection_evidence_encoding': 'reflection_evidence_ids_v1',
+                    **source_provenance()}
         (args.output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
         session = DynamicSession(actuator, client, space, environment, args.output, plan, timing,
                                  backend_kind=args.backend, seed=args.seed, llm_calls=args.llm_calls, llm_tokens=args.llm_tokens)

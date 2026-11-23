@@ -127,9 +127,15 @@ class AgenticDBBackend:
             return self.cache[cache_key]
         # Byte-length is a conservative reservation, not a reported tokenizer count.
         reservation = len((PROMPTS[role] + text).encode()) + self.max_output_tokens + 64
+        remaining_before = self.ledger.limits.llm_tokens - self.ledger.llm_tokens
         self.ledger.reserve_llm(reservation)
         started = time.monotonic()
-        trace = {"role": role, "model": self.client.model, "system_prompt": PROMPTS[role], "payload": payload}
+        trace = {
+            "role": role, "model": self.client.model, "system_prompt": PROMPTS[role], "payload": payload,
+            "reservation": {"input_bytes": len((PROMPTS[role] + text).encode()),
+                            "max_output_tokens": self.max_output_tokens, "protocol_margin": 64,
+                            "reserved_tokens": reservation, "remaining_tokens_before": remaining_before},
+        }
         try:
             result = self.client._call_openai_compatible(
                 text, operation=f"admtune_{role}", system_prompt=PROMPTS[role],
