@@ -11,6 +11,7 @@ import math
 import os
 from pathlib import Path
 import random
+import socket
 import threading
 import time
 
@@ -39,7 +40,7 @@ class ReplayPlan:
     max_emit_lag_seconds: float = 0.5
 
     def __post_init__(self):
-        if self.scenario not in {"composition", "intensity"}:
+        if self.scenario not in {"composition", "intensity", "steady", "transient"}:
             raise ValueError("Unknown replay scenario")
         for name in ["phase_seconds", "window_seconds", "slices", "base_rate", "high_rate", "tables", "table_size", "workers", "queue_size"]:
             value = getattr(self, name)
@@ -59,6 +60,10 @@ class ReplayPlan:
     @property
     def duration(self):
         return 3 * self.phase_seconds
+
+    @property
+    def expected_phase_count(self):
+        return 3 if self.scenario in {"composition", "intensity"} else 1
 
 
 @dataclass(frozen=True)
@@ -86,12 +91,15 @@ def make_schedule(plan: ReplayPlan) -> list[Request]:
     requests = []
     for second in range(plan.duration):
         phase_index = second // plan.phase_seconds
-        rate = plan.high_rate if plan.scenario == "intensity" and phase_index == 1 else plan.base_rate
+        transient = plan.scenario == "transient" and second in {plan.phase_seconds, 2 * plan.phase_seconds}
+        high = (plan.scenario == "intensity" and phase_index == 1) or transient
+        rate = plan.high_rate if high else plan.base_rate
         reads = rate * (1 if phase_index == 1 else 9) // 10 if plan.scenario == "composition" else rate // 2
         operations = ["read"] * reads + ["write"] * (rate - reads)
         rng.shuffle(operations)
         for i, operation in enumerate(operations):
-            requests.append(Request(len(requests), second + i / rate, "ABA"[phase_index], operation,
+            label = "ABA"[phase_index] if plan.expected_phase_count == 3 else ("B" if transient else "A")
+            requests.append(Request(len(requests), second + i / rate, label, operation,
                                     rng.randint(1, plan.tables), rng.randint(1, plan.table_size)))
     return requests
 
@@ -137,6 +145,7 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True) -
     totals = dict(offered=0, submitted=0, dropped=0, succeeded=0, failed=0)
     max_lag = 0.0
     ready = []
+    event_counts = {}
     def work(request):
         begin = time.monotonic() - started
         try:
@@ -158,6 +167,8 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True) -
             start = window_index * plan.window_seconds
             w = Window(start, start + plan.window_seconds, counts)
             detection = detector.observe(w)
+            if detection.event:
+                event_counts[detection.event] = event_counts.get(detection.event, 0) + 1
             if detection.event == "phase_ready":
                 ready.append({"end": w.end, "phase_id": detection.phase_id})
             windows.write(json.dumps({"window": asdict(w), "detection": asdict(detection),
@@ -199,6 +210,12 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True) -
               "complete": totals["offered"] == len(schedule) and totals["succeeded"] == len(schedule)
                           and max_lag <= plan.max_emit_lag_seconds,
               "three_phases_detected": len(ready) == 3,
+              "expected_phase_count": plan.expected_phase_count,
+              "phase_count_matches_plan": len(ready) == plan.expected_phase_count,
+              "detector_event_counts": event_counts,
+              "detector_matches_plan": len(ready) == plan.expected_phase_count
+                                       and event_counts.get("change_confirmed", 0) == plan.expected_phase_count - 1
+                                       and detector.state == "stable",
               "wall_seconds": time.monotonic() - started,
               "replay_started_at_utc": replay_started_at,
               "llm_calls": 0, "configuration_mutations": 0,
@@ -273,7 +290,7 @@ def main():
     parser.add_argument("--target", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
-    parser.add_argument("--scenario", choices=["composition", "intensity"], required=True)
+    parser.add_argument("--scenario", choices=["composition", "intensity", "steady", "transient"], required=True)
     parser.add_argument("--dedicated-instance", action="store_true")
     args = parser.parse_args()
     if not args.dedicated_instance:
@@ -294,6 +311,7 @@ def main():
         preflight = client.preflight(plan)
         initial = client.snapshot()
         manifest = {"plan": asdict(plan), "preflight": preflight, **source_provenance(),
+                    "execution_hostname": socket.gethostname(),
                     "created_at_utc": created_at, "initial_database_state": initial,
                     "environment_ids": target.get("admtune", {}),
                     "declared_hardware": target.get("target", {}).get("hardware", {}),
@@ -332,7 +350,7 @@ def main():
                 result["complete"] = False
                 (args.output / "summary.json").write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
-    return 0 if result.get("complete") and result.get("three_phases_detected") else 1
+    return 0 if result.get("complete") and result.get("detector_matches_plan") else 1
 
 
 if __name__ == "__main__":

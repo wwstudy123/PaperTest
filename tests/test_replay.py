@@ -97,10 +97,42 @@ class ReplayTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ReplayPlan(**kwargs)
 
-    def run_fake(self, output, execute=lambda r: 1, pool=Pool):
+    def run_fake(self, output, execute=lambda r: 1, pool=Pool, plan=None):
         clock = Clock()
         with patch('admtune.replay.time.monotonic', clock.monotonic), patch('admtune.replay.time.sleep', clock.sleep), patch('admtune.replay.ThreadPoolExecutor', pool):
-            return replay(ReplayPlan(), execute, output)
+            return replay(plan or ReplayPlan(), execute, output)
+
+    def test_steady_plan_has_no_actual_load_switch(self):
+        p = ReplayPlan(scenario='steady')
+        requests = make_schedule(p)
+        self.assertEqual(len(requests), 720)
+        self.assertEqual({r.phase for r in requests}, {'A'})
+        for second in range(p.duration):
+            rows = [r for r in requests if second <= r.scheduled < second + 1]
+            self.assertEqual(len(rows), 10)
+            self.assertEqual(sum(r.operation == 'read' for r in rows), 5)
+
+    def test_transient_plan_is_two_one_second_pulses(self):
+        p = ReplayPlan(scenario='transient')
+        requests = make_schedule(p)
+        self.assertEqual(len(requests), 760)
+        for second in range(p.duration):
+            rows = [r for r in requests if second <= r.scheduled < second + 1]
+            self.assertEqual(len(rows), 30 if second in {24, 48} else 10)
+            self.assertEqual(sum(r.operation == 'read' for r in rows), len(rows) // 2)
+
+    def test_negative_controls_suppress_persistent_changes(self):
+        for scenario in ['steady', 'transient']:
+            with tempfile.TemporaryDirectory() as t:
+                summary = self.run_fake(Path(t), plan=ReplayPlan(scenario=scenario))
+                self.assertTrue(summary['complete'])
+                self.assertTrue(summary['detector_matches_plan'])
+                self.assertEqual(summary['phase_ready'], [{'end': 8, 'phase_id': 'phase-1'}])
+                self.assertEqual(summary['detector_event_counts'].get('change_confirmed', 0), 0)
+                self.assertEqual(summary['detector_event_counts'].get('change_suspected', 0),
+                                 2 if scenario == 'transient' else 0)
+                self.assertFalse(summary['three_phases_detected'])
+                self.assertEqual(export_replay(Path(t))['windows'], 18)
 
     def test_execution_export_and_checksums(self):
         with tempfile.TemporaryDirectory() as t:
@@ -108,6 +140,7 @@ class ReplayTests(unittest.TestCase):
             summary = self.run_fake(root)
             self.assertTrue(summary['simulated'])
             self.assertTrue(summary['complete'])
+            self.assertTrue(summary['detector_matches_plan'])
             self.assertEqual(summary['counts']['succeeded'], 720)
             report = export_replay(root)
             self.assertEqual(report['requests'], 720)
