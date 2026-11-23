@@ -38,6 +38,7 @@ class ReplayPlan:
     queue_size: int = 32
     seed: int = 42
     max_emit_lag_seconds: float = 0.5
+    read_percent: int = 50
 
     def __post_init__(self):
         if self.scenario not in {"composition", "intensity", "steady", "transient"}:
@@ -52,6 +53,10 @@ class ReplayPlan:
             raise ValueError("Integral slices and rates divisible by ten required")
         if self.high_rate <= self.base_rate:
             raise ValueError("High rate must exceed base rate")
+        if type(self.read_percent) is not int or self.read_percent not in range(0, 101, 10):
+            raise ValueError("Read percentage must be an integer multiple of ten")
+        if self.scenario != "steady" and self.read_percent != 50:
+            raise ValueError("Explicit read percentage is supported only by steady replay")
         if not math.isfinite(self.max_emit_lag_seconds) or self.max_emit_lag_seconds <= 0:
             raise ValueError("Finite positive emission lag bound required")
         if self.duration * self.high_rate > 100000:
@@ -94,7 +99,8 @@ def make_schedule(plan: ReplayPlan) -> list[Request]:
         transient = plan.scenario == "transient" and second in {plan.phase_seconds, 2 * plan.phase_seconds}
         high = (plan.scenario == "intensity" and phase_index == 1) or transient
         rate = plan.high_rate if high else plan.base_rate
-        reads = rate * (1 if phase_index == 1 else 9) // 10 if plan.scenario == "composition" else rate // 2
+        reads = (rate * (1 if phase_index == 1 else 9) // 10 if plan.scenario == "composition"
+                 else rate * plan.read_percent // 100 if plan.scenario == "steady" else rate // 2)
         operations = ["read"] * reads + ["write"] * (rate - reads)
         rng.shuffle(operations)
         for i, operation in enumerate(operations):
