@@ -31,6 +31,20 @@ class LLMBudgetTests(unittest.TestCase):
         self.assertEqual(ledger.llm_tokens, 50)
         self.assertEqual(client.response_retries, 0)
 
+    def test_compact_transport_preserves_payload_and_byte_reservation(self):
+        from admtune.agents import PROMPTS
+        client = self.client()
+        client.consume_last_usage.return_value = None
+        ledger = Ledger(Limits(llm_calls=1, llm_tokens=10000))
+        backend = AgenticDBBackend(client, ledger, max_output_tokens=100)
+        payload = {"catalog": [{"name": "缓冲池", "values": [1, 2]}]}
+        backend.complete("selector", payload)
+        text = client._call_openai_compatible.call_args.args[0]
+        self.assertEqual(json.loads(text), payload)
+        self.assertEqual(text, json.dumps(payload, ensure_ascii=False, sort_keys=True,
+                                         separators=(",", ":")))
+        self.assertEqual(ledger.llm_tokens, len((PROMPTS["selector"] + text).encode()) + 164)
+
     def test_error_consumes_attempt_and_does_not_fallback(self):
         client = self.client()
         client._call_openai_compatible.side_effect = RuntimeError("API failed")

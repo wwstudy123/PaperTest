@@ -83,9 +83,18 @@ class PooledTeam(Team):
     """每阶段一批候选，实际逐个测量和更新 GP；不是复用预先给定最优答案。"""
     def initialize(self, context, experiences, *, diagnostics=None):
         self.pool = None
+        # GP refusal thresholds belong to the preceding phase/model. Compatible
+        # observations remain available through retrieval, not stale feedback.
+        self.feedback = {}
         measured = [x for x in experiences if x.get('type') == 'measurement'][:1]
         summaries = [
-            {k: x[k] for k in ['type', 'conditions', 'evidence_ids', 'hypotheses'] if k in x}
+            {
+                **{k: x[k] for k in ['type', 'conditions', 'evidence_ids'] if k in x},
+                'hypothesis_previews': [
+                    {'text': str(h)[:160], 'truncated': len(str(h)) > 160}
+                    for h in x.get('hypotheses', [])[:2]
+                ],
+            }
             for x in experiences if x.get('type') == 'reflection'
         ][-1:]
         super().initialize(context, measured + summaries, diagnostics=diagnostics)

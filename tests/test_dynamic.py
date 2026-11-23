@@ -175,6 +175,25 @@ class DynamicTests(unittest.TestCase):
         self.assertEqual(backend.calls.count('recommender'), 1)
         self.assertGreaterEqual(len(first), 4)
 
+    def test_new_phase_clears_old_gp_feedback_and_bounds_text_preview(self):
+        space = demo_space();backend = HeuristicBackend(0)
+        team = PooledTeam(space, backend, batch_size=6, max_selected=4)
+        team.feedback = {'log_admission_floor': -123, 'evaluations': ['old'] * 100}
+        experience = {'type': 'reflection', 'conditions': {'objective_key': 'p95_latency_ms:minimize'},
+                      'evidence_ids': ['real-id'], 'hypotheses': ['长' * 1000] * 20}
+        original = json.dumps(experience)
+        with patch.object(backend, 'complete', wraps=backend.complete) as complete:
+            team.initialize([0], [experience])
+        payload = complete.call_args_list[0].args[1]
+        self.assertEqual(payload['feedback'], {})
+        preview = payload['experiences'][0]
+        self.assertEqual(preview['evidence_ids'], ['real-id'])
+        self.assertEqual(preview['conditions'], experience['conditions'])
+        self.assertEqual(len(preview['hypothesis_previews']), 2)
+        self.assertTrue(all(x['truncated'] and len(x['text']) == 160
+                            for x in preview['hypothesis_previews']))
+        self.assertEqual(json.dumps(experience), original)
+
     def test_dynamic_cli_requires_paid_authorization_and_smoke_label(self):
         base = ['dynamic', '--target', '/missing', '--benchmark', '/missing', '--knobs', '/missing',
                 '--output', '/missing', '--dedicated-instance']

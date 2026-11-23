@@ -118,7 +118,10 @@ class AgenticDBBackend:
         self.trace_dir = trace_dir
 
     def complete(self, role: str, payload: dict) -> dict:
-        text = json.dumps(payload, ensure_ascii=False, sort_keys=True, allow_nan=False)
+        # Reserve against the exact compact bytes sent; do not lower the safety
+        # estimate or replace actual provider usage with a guessed token count.
+        text = json.dumps(payload, ensure_ascii=False, sort_keys=True, allow_nan=False,
+                          separators=(",", ":"))
         cache_key = fingerprint([role, payload])
         if cache_key in self.cache:
             return self.cache[cache_key]
