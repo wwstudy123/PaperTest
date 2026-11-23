@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import math
+from pathlib import Path
+import json
 import uuid
 
 import numpy as np
@@ -47,6 +49,7 @@ class Controller:
         self, *, space: Space, environment: Environment, objective: Objective,
         detector: PhaseDetector, executor: Executor, team: Team, reflector: Reflector,
         store: Store, ledger: Ledger, policy: Policy, seed: int = 0,
+        snapshot_dir: Path | None = None,
     ):
         self.space, self.environment, self.objective = space, environment, objective
         self.detector, self.executor, self.team = detector, executor, team
@@ -59,6 +62,7 @@ class Controller:
         self.active = False
         self.seen: set[tuple[str, str]] = set()
         self.replans = self.no_gain = 0
+        self.snapshot_dir = snapshot_dir
         self.gp = GaussianProcess(
             kernel=policy.kernel, config_dimensions=len(space.encode(self.current)), seed=seed,
         )
@@ -126,6 +130,10 @@ class Controller:
         """Initialize a measured phase; static mode explicitly supplies constant context."""
         self.phase_id = phase_id
         self.last_context = list(context)
+        self.active = False
+        self.baseline = self.best_value = None
+        self.best_config = dict(self.current)
+        self.gp.fitted = False
         self.replans = self.no_gain = 0
         baseline = self.trial(self.current, context, kind="baseline")
         if not baseline.trainable or not baseline.constraints_ok:
@@ -212,6 +220,14 @@ class Controller:
         x = [self.space.encode(t.config) + t.context for t in history]
         y = [self.objective.target(t.value) for t in history]
         self.gp.fit(x, y, optimize=self.gp.version % 3 == 0)
+        if self.snapshot_dir is not None:
+            self.snapshot_dir.mkdir(parents=True, exist_ok=True)
+            payload = {**self.gp.snapshot([t.trial_id for t in history]),
+                       "phase_id": self.phase_id, "objective": self.objective.key}
+            path = self.snapshot_dir / f"gp-{self.gp.version:04d}.json"
+            path.write_text(json.dumps(payload, indent=2))
+            self.store.event("gp_fit", {"path": path.name, "version": self.gp.version,
+                                       "training_ids": payload["training_ids"]})
 
     def step(self) -> Trial | None:
         if not self.active or self.detector.state != "stable" or self.detector.changed_count:

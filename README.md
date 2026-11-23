@@ -37,7 +37,9 @@ python3 -m venv .venv
 
 真实试验必须显式传入 `--dedicated-instance`。数据库服务重启需要额外的 `--allow-restart`。付费模型调用还需要 `--backend llm --allow-paid-llm` 和明确的调用、令牌预算。
 
-另提供不调用模型、不修改配置的真实外生 A→B→A 回放入口，见[动态回放与绘图记录](docs/DYNAMIC_REPLAY.md)。该入口只验收到达监测，不是动态调优。动态调优闭环、完整 OLAP 执行和正式基线对照仍待集成。
+另提供不调用模型、不修改配置的真实外生 A→B→A 回放入口，见[动态回放与绘图记录](docs/DYNAMIC_REPLAY.md)。该入口只验收到达监测，不是动态调优。
+
+真实动态闭环试运行入口为 `python -m admtune.dynamic`，见[动态闭环手册](docs/DYNAMIC_LOOP.md)。采用独立调优线程和同一请求流的 P95，先零 LLM 验收，再显式授权付费角色；不是正式基线或消融结论。完整 OLAP 和同协议论文基线仍待完成。
 
 阶段时长先用 `admtune.phase_safety` 按实际 benchmark 规划；跨阶段观测保护及验收入口见[阶段预算与观测栅栏](docs/PHASE_SAFETY.md)。24 秒监测烟测不能直接套用 75 秒静态测量。
 

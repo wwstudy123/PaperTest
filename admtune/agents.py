@@ -17,6 +17,7 @@ PROMPTS = {
     "selector": (
         "你负责选择数据库参数。依据负载、诊断与实测历史，从 catalog 选择不超过 "
         "max_selected 个唯一参数名。运行指标只是诊断，不是因果证据。保持持久性和压测语义不变。"
+        "诊断中的 objective_key 定义目标；minimize 表示越低越好。"
         '仅返回 JSON：{"selected":["目录中的参数名"],"rationale":"简短依据"}。'
     ),
     "pruner": (
@@ -32,6 +33,7 @@ PROMPTS = {
         "仅使用 selected 参数与 ranges 范围，严格遵循 catalog 的类型、特殊值和步长。"
         "未改参数继承父配置；每个候选至少一项实际变化，候选之间不同。"
         "结合 feedback 避免重复被拒绝的配置。历史只证明观测到的组合效果，不是因果规律。"
+        "以 diagnostics.objective_key 为准；minimize 表示越低越好，不默认最大化历史数值。"
         '仅返回一个 JSON 对象：{"candidates":[{"参数名":具体数值或枚举值}]}。'
         "每项直接是变更字典，不嵌套 config，不增加说明字段，不虚构实测收益。"
     ),
@@ -40,6 +42,8 @@ PROMPTS = {
         "evidence_ids 五个字段。facts 必须完整复制输入 facts 的 trial_id/status/value，"
         "不得遗漏、修改数字、改变状态或添加文字事实。conditions 原样复制输入条件。"
         "hypotheses 是待验证解释的字符串数组，不是确定性规则。"
+        "record_context 给出配置与试验类型；同配置复测的差异是波动证据，不能解释成搜索空间变化。"
+        "以 conditions.objective_key 为准，minimize 表示越低越好。"
         "actions 是字符串数组，只能选 resample/adjust_range/reselect/verify/stop。"
         "evidence_ids 列出全部所引用的试验编号。不要改变硬约束，不将未执行配置标记为成功。"
     ),

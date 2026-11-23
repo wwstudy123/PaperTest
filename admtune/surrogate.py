@@ -56,6 +56,7 @@ class GaussianProcess:
         ):
             raise ValueError("At least two finite compatible observations required")
         self.x = x
+        self.y = y.copy()
         self.y_mean, self.y_scale = float(y.mean()), max(float(y.std()), 0.01)
         centered = (y - self.y_mean) / self.y_scale
 
@@ -80,10 +81,49 @@ class GaussianProcess:
             fits = [minimize(nll, start, method="L-BFGS-B", bounds=bounds, options={"maxiter": 60}) for start in starts]
             usable = [f for f in fits if np.isfinite(f.fun) and f.fun < 1e29]
             if usable:
-                self.theta = min(usable, key=lambda f: f.fun).x
+                best = min(usable, key=lambda f: f.fun)
+                self.theta = best.x
+                self.optimizer = {"optimized": True, "success": bool(best.success),
+                                  "negative_log_marginal_likelihood": float(best.fun),
+                                  "iterations": int(best.nit)}
+            else:
+                self.optimizer = {"optimized": True, "success": False}
+        else:
+            self.optimizer = {"optimized": False, "reused_hyperparameters": True}
         self.lower, self.alpha = decompose(self.theta)
         self.version += 1
         self.fitted = True
+
+    def snapshot(self, training_ids: list[str]) -> dict:
+        if not self.fitted or len(training_ids) != len(self.x):
+            raise ValueError("Snapshot requires an exact ordered training-ID list")
+        return {
+            "version": self.version, "kernel": self.kernel, "config_dimensions": self.config_dimensions,
+            "input_dimensions": self.x.shape[1], "training_ids": training_ids,
+            "x": self.x.tolist(), "target": self.y.tolist(),
+            "target_mean": self.y_mean, "target_scale": self.y_scale,
+            "log_hyperparameters": self.theta.tolist(),
+            "hyperparameters": dict(zip(["length_scale", "amplitude", "noise_std"], np.exp(self.theta).tolist())),
+            "jitter": 1e-9, "seed": self.seed, "optimizer": self.optimizer,
+        }
+
+    @classmethod
+    def from_snapshot(cls, payload: dict):
+        theta = np.asarray(payload["log_hyperparameters"], dtype=float)
+        if theta.shape != (3,) or not np.isfinite(theta).all():
+            raise ValueError("Invalid GP hyperparameters")
+        model = cls(kernel=payload["kernel"], config_dimensions=int(payload["config_dimensions"]),
+                    seed=int(payload["seed"]))
+        model.theta = theta
+        model.fit(payload["x"], payload["target"], optimize=False)
+        if (len(payload["training_ids"]) != len(model.x)
+                or model.x.shape[1] != payload["input_dimensions"]
+                or not math.isclose(model.y_mean, payload["target_mean"], abs_tol=1e-12)
+                or not math.isclose(model.y_scale, payload["target_scale"], abs_tol=1e-12)):
+            raise ValueError("Snapshot training schema or normalization mismatch")
+        model.version = int(payload["version"])
+        model.optimizer = payload["optimizer"]
+        return model
 
     def predict(self, x) -> list[Prediction]:
         if not self.fitted:

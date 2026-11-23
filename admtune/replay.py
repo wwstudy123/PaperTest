@@ -130,7 +130,7 @@ def monitor(plan: ReplayPlan):
                                "note": "预声明联调阈值，非正式校准结果；不读取阶段标签"}
 
 
-def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, guard=None) -> dict:
+def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, guard=None, observer=None) -> dict:
     """execute 只由有界工作线程调用；调度不等待查询完成，过载明确丢弃。"""
     schedule = make_schedule(plan)
     catalog, detector, metadata = monitor(plan)
@@ -139,6 +139,8 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, g
     (output / "monitor.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2))
     replay_started_at = datetime.now(timezone.utc).isoformat()
     started = time.monotonic()
+    if observer is not None:
+        observer.on_start(started)
     pending = {}
     counts = [[0] * (catalog.cluster_count + 1) for _ in range(plan.slices)]
     window_index = 0
@@ -149,9 +151,10 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, g
     def work(request):
         begin = time.monotonic() - started
         try:
-            rows = execute(request)
+            result = execute(request)
+            details = result if isinstance(result, dict) else {"rows": result}
             return {"seq": request.seq, "started": begin, "completed": time.monotonic() - started,
-                    "ok": True, "rows": rows}
+                    "ok": True, **details}
         except Exception as exc:
             return {"seq": request.seq, "started": begin, "completed": time.monotonic() - started,
                     "ok": False, "error_type": type(exc).__name__}
@@ -161,7 +164,10 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, g
                 if future.done():
                     record = future.result()
                     totals["succeeded" if record["ok"] else "failed"] += 1
-                    results.write(json.dumps({**pending.pop(future), **record}) + "\n")
+                    full = {**pending.pop(future), **record}
+                    results.write(json.dumps(full) + "\n")
+                    if observer is not None:
+                        observer.on_result(full)
         def finish_window():
             nonlocal counts, window_index
             start = window_index * plan.window_seconds
@@ -176,6 +182,8 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, g
             if guard is not None:
                 # 此回调只更新短小的观测状态；不得在调度线程中执行调参或压测。
                 guard.observe(w, detection)
+            if observer is not None:
+                observer.on_window(w, detection)
             windows.flush()
             offered.flush()
             results.flush()
@@ -183,6 +191,8 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, g
             counts = [[0] * (catalog.cluster_count + 1) for _ in range(plan.slices)]
         with ThreadPoolExecutor(max_workers=plan.workers) as pool:
             for request in schedule:
+                if observer is not None:
+                    observer.check_health()
                 while request.scheduled >= (window_index + 1) * plan.window_seconds:
                     deadline = started + (window_index + 1) * plan.window_seconds
                     time.sleep(max(0, deadline - time.monotonic()))
@@ -200,8 +210,12 @@ def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, g
                 if len(pending) >= plan.workers + plan.queue_size:
                     totals["dropped"] += 1
                     offered.write(json.dumps({**record, "submitted": False}) + "\n")
+                    if observer is not None:
+                        observer.on_offered({**record, "submitted": False})
                 else:
                     totals["submitted"] += 1
+                    if observer is not None:
+                        observer.on_offered({**record, "submitted": True})
                     pending[pool.submit(work, request)] = record
                     offered.write(json.dumps({**record, "submitted": True}) + "\n")
             time.sleep(max(0, started + plan.duration - time.monotonic()))

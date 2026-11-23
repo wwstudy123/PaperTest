@@ -8,11 +8,15 @@ class Reflector:
     def __init__(
         self, store: Store, backend: Backend, *, mode: str = "incremental",
         min_batch: int = 3, max_batch: int = 12,
+        old_summary_limit: int = 3,
     ):
         if mode not in {"none", "incremental", "full"} or not 1 <= min_batch <= max_batch:
             raise ValueError("Invalid reflection settings")
         self.store, self.backend, self.mode = store, backend, mode
         self.min_batch, self.max_batch = min_batch, max_batch
+        if old_summary_limit < 0:
+            raise ValueError("Summary limit must be nonnegative")
+        self.old_summary_limit = old_summary_limit
 
     def trigger(self, events: list[str], *, force: bool = False, phase_id: str | None = None) -> bool:
         pending = self.store.pending(phase_id=phase_id)
@@ -38,7 +42,13 @@ class Reflector:
             "facts": facts,
             "conditions": {"environment_key": environment, "objective_key": objective},
             "events": sorted(set(events)),
-            "old_summaries": old_summaries[-3:] if self.mode == "incremental" else [],
+            "old_summaries": old_summaries[-self.old_summary_limit:]
+            if self.mode == "incremental" and self.old_summary_limit else [],
+            "record_context": [
+                {"trial_id": t.trial_id, "config": t.config, "phase_id": t.phase_id,
+                 "kind": t.metadata.get("kind"), "constraints_ok": t.constraints_ok}
+                for t in records
+            ],
         }
         # Failure leaves all evidence pending. No automatic free/unbounded API retries.
         output = self.backend.complete("reflection", payload)
