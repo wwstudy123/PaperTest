@@ -189,7 +189,8 @@ class Controller:
             trial_id, self.phase_id, self.environment.key, self.objective.key, config,
             list(context), measured.status, measured.value, measured.complete,
             measured.effective, measured.constraints_ok, prediction_dict,
-            {**measured.metadata, "kind": kind, "simulated": self.executor.simulated},
+            {**measured.metadata, "kind": kind, "simulated": self.executor.simulated,
+             "parent_config": before},
         )
         accepted = (
             record.trainable and record.constraints_ok
@@ -200,9 +201,13 @@ class Controller:
         self.seen.add((self.phase_id, fingerprint(config)))
         if accepted and kind != "verification":
             self.current = dict(config)
+            self.store.event("config_accepted", {"trial_id": trial_id, "phase_id": self.phase_id,
+                                                "config": config, "value": record.value})
         else:
             try:
                 self.executor.restore(before)
+                self.store.event("config_restored", {"trial_id": trial_id, "phase_id": self.phase_id,
+                                                    "target_config": before})
             except Exception as exc:
                 self.active = False
                 self.store.event("recovery_failed", {"trial_id": trial_id, "reason": str(exc)})

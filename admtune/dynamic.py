@@ -195,9 +195,21 @@ class DynamicSession:
                         values = []
                         if controller.baseline is not None and len(phase_records) < self.timing.trials_per_phase:
                             controller.last_context = list(latest.context)
-                            record = controller.trial(controller.best_config, controller.last_context, kind='verification')
+                            controller.fit(controller.last_context)
+                            prediction = controller.gp.predict([
+                                self.space.encode(controller.best_config) + controller.last_context
+                            ])[0] if controller.gp.fitted else None
+                            record = controller.trial(controller.best_config, controller.last_context,
+                                                      kind='verification', prediction=prediction)
                             if record.trainable and record.constraints_ok:
                                 values.append(record.value)
+                            if record.trainable and prediction:
+                                residual = (controller.objective.target(record.value) - prediction.mean) / max(prediction.observation_std, 1e-9)
+                                store.event('verification_prediction_error', {
+                                    'trial_id': record.trial_id, 'residual': residual, 'covered': abs(residual) <= 2,
+                                    'scope': 'repeat_of_selected_config_not_independent_heldout',
+                                })
+                            controller.fit(controller.last_context)
                         verification[controller.phase_id] = values
                         reflection_count = len(store.reflections())
                         controller.reflect(['phase_end'], force=True)
@@ -236,10 +248,13 @@ class DynamicSession:
                     store.event('workload', window)
                 self.result = {
                     'simulated': self.actuator.simulated, 'objective': 'p95_latency_ms:minimize', 'backend': self.backend_kind,
+                    'mode': 'dynamic_tuning_pilot', 'llm_calls': ledger.llm_calls,
                     'phases': phases, 'budget': ledger.snapshot(), 'error': self.error,
                     'trial_statuses': {status: sum(t.status == status for t in records) for status in {t.status for t in records}},
                     'valid_observations': sum(t.trainable for t in records),
                     'prediction_observations': sum(t.trainable and t.prediction is not None for t in records),
+                    'predicted_search_observations': sum(t.trainable and t.prediction is not None and t.metadata.get('kind') != 'verification' for t in records),
+                    'predicted_verification_observations': sum(t.trainable and t.prediction is not None and t.metadata.get('kind') == 'verification' for t in records),
                     'gp_fit_events': sum(k == 'gp_fit' for k, _ in events),
                     'reflection_commits': sum(k == 'reflection_committed' for k, _ in events),
                     'llm_api_attempts': ledger.llm_calls,
@@ -247,7 +262,7 @@ class DynamicSession:
                     'closed_loop_completed': len(phases) == 3 and all(
                         p['baseline_value'] is not None and p['verification_values'] and p['valid_candidates'] > 0
                         for p in phases
-                    ) and any(t.trainable and t.prediction for t in records)
+                    ) and any(t.trainable and t.prediction for t in records) and any(k == 'prescreen' for k, _ in events)
                     and sum(k == 'reflection_committed' for k, _ in events) == 3,
                     'is_thesis_evidence': False,
                     'note': '真实动态闭环试运行；未经正式校准、快照复位或方法对比，不能声称性能优势。',
@@ -385,6 +400,8 @@ def main():
                 result['initial_configuration_restored'] = actuator.initial is not None
                 if client:
                     client.publish(actuator.initial.config)
+                    result['configuration_mutations'] = client.generation
+                    result['configuration_mutation_definition'] = 'logical_config_changes_including_recovery'
                 result['final_config_sha256'] = hashlib.sha256(
                     actuator.connector.read_file(actuator.settings.config_path, sudo=True).encode()
                 ).hexdigest() if actuator.initial else None
