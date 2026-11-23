@@ -33,6 +33,7 @@ from .reflection import Reflector
 from .replay import ReplayPlan, replay
 from .replay_report import export_replay, write_csv
 from .security import redact
+from tools.mysql_resize import wait_buffer_pool_ready
 
 
 def instance_lock(config_path):
@@ -47,6 +48,35 @@ def instance_lock(config_path):
         handle.close()
         raise
     return handle
+
+
+def completion_checks(phases, records, events):
+    """保守不试也是合法决策；但不能把它等同于新配置预测效果已验证。"""
+    ready_phases = len(phases) == 3 and all(
+        p['baseline_value'] is not None and p['verification_values'] for p in phases
+    )
+    refused = {
+        p['phase_id'] for kind, p in events
+        if kind == 'prescreen' and p.get('config_ids') and not p.get('eligible')
+    }
+    decisions = ready_phases and all(
+        p['valid_candidates'] > 0 or p['phase_id'] in refused for p in phases
+    )
+    has_prediction = any(t.trainable and t.prediction for t in records)
+    has_screen = any(k == 'prescreen' for k, _ in events)
+    reflections = sum(k == 'reflection_committed' for k, _ in events) == 3
+    common = decisions and has_prediction and has_screen and reflections
+    return {
+        'acceptance_contract': 'control_flow_v2_resize_stable',
+        'control_flow_completed': bool(common and any(p['valid_candidates'] > 0 for p in phases)),
+        'closed_loop_completed': bool(common and all(p['valid_candidates'] > 0 for p in phases)),
+        'gp_selected_execution_exercised': any(
+            t.trainable and t.prediction and t.metadata.get('kind') in {'startup', 'candidate'} for t in records
+        ),
+        'conservative_no_trial_phases': sorted(
+            p['phase_id'] for p in phases if p['valid_candidates'] == 0 and p['phase_id'] in refused
+        ),
+    }
 
 
 class PooledTeam(Team):
@@ -118,7 +148,8 @@ class DynamicSession:
             self._worker()
         except BaseException as exc:
             self.error = redact(str(exc))
-            self.result = {**(self.result or {}), 'error': self.error, 'closed_loop_completed': False}
+            self.result = {**(self.result or {}), 'error': self.error,
+                           'closed_loop_completed': False, 'control_flow_completed': False}
             try:
                 (self.output / 'dynamic_summary.json').write_text(json.dumps(self.result, indent=2))
             except Exception:
@@ -259,14 +290,12 @@ class DynamicSession:
                     'reflection_commits': sum(k == 'reflection_committed' for k, _ in events),
                     'llm_api_attempts': ledger.llm_calls,
                     'heuristic_role_invocations': len(backend.calls) if isinstance(backend, HeuristicBackend) else 0,
-                    'closed_loop_completed': len(phases) == 3 and all(
-                        p['baseline_value'] is not None and p['verification_values'] and p['valid_candidates'] > 0
-                        for p in phases
-                    ) and any(t.trainable and t.prediction for t in records) and any(k == 'prescreen' for k, _ in events)
-                    and sum(k == 'reflection_committed' for k, _ in events) == 3,
+                    **completion_checks(phases, records, events),
                     'is_thesis_evidence': False,
                     'note': '真实动态闭环试运行；未经正式校准、快照复位或方法对比，不能声称性能优势。',
                 }
+                if self.error:
+                    self.result.update(closed_loop_completed=False, control_flow_completed=False)
                 (self.output / 'dynamic_summary.json').write_text(json.dumps(self.result, ensure_ascii=False, indent=2))
                 self._export_trials(records)
                 store.close()
@@ -340,7 +369,7 @@ def main():
         parser.error('Shorter timing requires --smoke and must not be reported as calibrated or formal')
     try:
         timing = PhaseTiming(warmup_seconds=args.warmup_seconds, measurement_seconds=args.measurement_seconds,
-                             apply_seconds=1 if args.smoke else 5, recovery_seconds=1 if args.smoke else 5,
+                             apply_seconds=5, recovery_seconds=5,
                              proposal_seconds_per_phase=0 if args.backend == 'heuristic' else 30, trials_per_phase=6)
         timing.validate_phase(args.phase_seconds)
         plan = ReplayPlan(phase_seconds=args.phase_seconds, seed=42 + args.seed)
@@ -405,7 +434,11 @@ def main():
                 result['controller_stop_error'] = redact(str(exc))
         if worker_stopped:
             try:
+                wait_buffer_pool_ready(actuator.db, actuator.readback()['innodb_buffer_pool_size'], timeout=60)
                 actuator.restore_initial()
+                result['final_buffer_pool_ready'] = wait_buffer_pool_ready(
+                    actuator.db, actuator.initial.config['innodb_buffer_pool_size'], timeout=60
+                )
                 result['initial_configuration_restored'] = actuator.initial is not None
                 if client:
                     client.publish(actuator.initial.config)
@@ -433,7 +466,7 @@ def main():
                 result['export_error'] = redact(str(exc))
                 (args.output / 'summary.json').write_text(json.dumps(result, ensure_ascii=False, indent=2))
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0 if result.get('complete') and result.get('closed_loop_completed') and result.get('initial_configuration_restored') else 1
+    return 0 if result.get('complete') and result.get('control_flow_completed') and result.get('initial_configuration_restored') else 1
 
 
 if __name__ == '__main__':

@@ -15,6 +15,7 @@ from .replay import MySQLRequests
 from .security import redact
 from tools.apply_db_config import apply_db_config, _format_mysql_sql_value
 from tools.rollback import create_config_backup
+from tools.mysql_resize import wait_buffer_pool_ready
 
 
 class GenerationalRequests(MySQLRequests):
@@ -153,6 +154,7 @@ class DynamicExecutor:
         self.estimated_trial_seconds = timing.trial_reserve
         self.last_admitted = False
         self.counter = 0
+        self.resize_checks = []
 
     def readback(self):
         return self.actuator.readback()
@@ -173,18 +175,20 @@ class DynamicExecutor:
     def _prepare(self, config):
         a = self.actuator
         config = a.space.merge(config, {})
+        self.client.begin_change()
         before = a.snapshot()
         a.pending = before
         self.last_admitted = True
+        self.resize_checks = [wait_buffer_pool_ready(a.db, before.config['innodb_buffer_pool_size'], timeout=60)]
         a.counter += 1
         create_config_backup(a.connector, config_path=a.settings.config_path,
                              round_id=a.counter, run_dir=a.run_dir)
         delta = {name: value for name, value in config.items() if before.config[name] != value}
         if delta:
-            self.client.begin_change()
             apply_db_config(a.connector, a.db, config_path=a.settings.config_path,
                             candidate_config=delta, knob_specs=a.specs)
         a._verify(config, before.invariants)
+        self.resize_checks.append(wait_buffer_pool_ready(a.db, config['innodb_buffer_pool_size'], timeout=60))
         generation = self.client.publish(config)
         return before, generation
 
@@ -192,9 +196,12 @@ class DynamicExecutor:
         if not self.last_admitted:
             if self.readback() != config:
                 raise RecoveryFailed('Configuration changed after refused admission')
+            self.client.publish(config)
             return
         self.client.begin_change()
+        wait_buffer_pool_ready(self.actuator.db, self.readback()['innodb_buffer_pool_size'], timeout=60)
         self.actuator.restore(config)
+        wait_buffer_pool_ready(self.actuator.db, config['innodb_buffer_pool_size'], timeout=60)
         self.client.publish(config)
 
     def measure(self, config, context):
@@ -214,7 +221,8 @@ class DynamicExecutor:
                     'phase_guard': self.telemetry.fence.snapshot(lease)}
         try:
             before, generation = self._prepare(config)
-            metadata.update(config_generation=generation, config_hash=fingerprint(config))
+            metadata.update(config_generation=generation, config_hash=fingerprint(config),
+                            buffer_pool_ready_checks=self.resize_checks)
             self.telemetry.wait_until(self.telemetry.elapsed() + self.timing.warmup_seconds, lease)
             start = self.telemetry.elapsed()
             end = start + self.timing.measurement_seconds

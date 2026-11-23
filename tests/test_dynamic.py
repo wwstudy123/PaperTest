@@ -15,7 +15,7 @@ from admtune.agents import HeuristicBackend
 from admtune.agents import Team
 from admtune.cli import demo_space
 from admtune.contracts import Environment, Objective, fingerprint
-from admtune.dynamic import DynamicSession, PooledTeam, main, instance_lock
+from admtune.dynamic import DynamicSession, PooledTeam, main, instance_lock, completion_checks
 from admtune.dynamic_runtime import DynamicExecutor, LiveTelemetry, GenerationalRequests
 from admtune.replay import MySQLRequests, Request
 from admtune.execution import SimulatedExecutor, Measurement
@@ -30,6 +30,32 @@ from admtune.workload import Window, Detection
 
 
 class DynamicTests(unittest.TestCase):
+    def test_conservative_history_reuse_is_reported_separately_from_new_search(self):
+        phases = [{'phase_id': f'phase-{i}', 'baseline_value': 3, 'verification_values': [3],
+                   'valid_candidates': 0 if i == 3 else 3} for i in range(1, 4)]
+        record = SimpleNamespace(trainable=True, prediction={'mean': -1},
+                                 metadata={'kind': 'verification'})
+        events = [('reflection_committed', {}) for _ in range(3)]
+        events += [('prescreen', {'phase_id': 'phase-3', 'config_ids': ['candidate'], 'eligible': []})]
+        result = completion_checks(phases, [record], events)
+        self.assertTrue(result['control_flow_completed'])
+        self.assertFalse(result['closed_loop_completed'])
+        self.assertFalse(result['gp_selected_execution_exercised'])
+        self.assertEqual(result['conservative_no_trial_phases'], ['phase-3'])
+        events[-1][1]['eligible'] = [0]
+        self.assertFalse(completion_checks(phases, [record], events)['control_flow_completed'])
+
+    def test_missing_baseline_or_reflection_cannot_pass_control_flow(self):
+        phases = [{'phase_id': f'phase-{i}', 'baseline_value': 3, 'verification_values': [3],
+                   'valid_candidates': 3} for i in range(1, 4)]
+        record = SimpleNamespace(trainable=True, prediction={'mean': -1}, metadata={'kind': 'candidate'})
+        events = [('reflection_committed', {}) for _ in range(3)] + [('prescreen', {})]
+        self.assertTrue(completion_checks(phases, [record], events)['closed_loop_completed'])
+        phases[0]['baseline_value'] = None
+        self.assertFalse(completion_checks(phases, [record], events)['control_flow_completed'])
+        phases[0]['baseline_value'] = 3
+        self.assertFalse(completion_checks(phases, [record], events[1:])['control_flow_completed'])
+
     def test_failed_new_baseline_does_not_reuse_old_phase_values(self):
         with tempfile.TemporaryDirectory() as t:
             space = demo_space();backend = HeuristicBackend(0)
