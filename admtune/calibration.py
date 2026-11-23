@@ -42,7 +42,7 @@ def baseline_plan():
     ]
 
 
-def sensitivity_plan(space, initial, rate):
+def sensitivity_plan(space, initial, rate, parameters=None):
     """Four single-knob probes, each bracketed by a reference, one block only."""
     deltas = [
         {"innodb_buffer_pool_size": 2 * 1024**3},
@@ -50,16 +50,66 @@ def sensitivity_plan(space, initial, rate):
         {"innodb_io_capacity_max": 6000},
         {"sort_buffer_size": 8 * 1024**2},
     ]
+    names = {next(iter(d)) for d in deltas}
+    if parameters is not None:
+        if not parameters or len(parameters) != len(set(parameters)) or set(parameters) - names:
+            raise ValueError("Explicit unique known sensitivity parameters required")
+        deltas = [d for d in deltas if next(iter(d)) in parameters]
     configs = [space.merge(initial, delta) for delta in deltas]
     if any(sum(c[n] != initial[n] for n in initial) != 1 for c in configs):
         raise ValueError("Each predeclared probe must change exactly one parameter")
     random.Random(20261124).shuffle(configs)
     specs = []
-    for i in range(9):
+    for i in range(2 * len(configs) + 1):
         config = dict(initial) if i % 2 == 0 else configs[i // 2]
         specs.append({"name": f"sensitivity-{i}", "kind": "reference" if i % 2 == 0 else "probe",
                       "rate": rate, "read_percent": 10, "seed": 600, "config": config})
     return specs
+
+
+def completed_sensitivity_parameters(records):
+    completed = set()
+    for left, candidate, right in zip(records, records[1:], records[2:]):
+        if [r["kind"] for r in (left, candidate, right)] != ["reference", "probe", "reference"]:
+            continue
+        if not all(r["valid"] and r["value_p95_ms"] is not None for r in (left, candidate, right)):
+            continue
+        if left["config"] != right["config"] or any(
+            len({r[k] for r in (left, candidate, right)}) != 1 for k in ("rate", "read_percent", "seed")
+        ):
+            raise ValueError("Mismatched sensitivity reference block")
+        changed = [k for k in left["config"] if left["config"][k] != candidate["config"][k]]
+        if len(changed) != 1:
+            raise ValueError("Sensitivity block did not isolate one knob")
+        completed.add(changed[0])
+    return completed
+
+
+def supplement_plan(parent, preflight, hardware):
+    manifest = json.loads((parent / "manifest.json").read_text())
+    summary = json.loads((parent / "summary.json").read_text())
+    records = read_jsonl(parent / "trials.jsonl")
+    if (manifest.get("mode") != "zero_llm_calibration" or manifest.get("git_dirty") is not False
+            or summary.get("completed") or not summary.get("initial_configuration_restored")
+            or summary.get("error") != "Calibration budget reached; no new trial"
+            or summary.get("llm_calls") != 0):
+        raise ValueError("Supplement only a restored original run stopped by its wall budget")
+    if (manifest["preflight"]["space_key"] != preflight["space_key"]
+            or manifest["preflight"]["current_config"] != preflight["current_config"]
+            or summary["final_config_sha256"] != preflight["config_sha256"]
+            or manifest["preflight"]["readiness"]["live_schema_hash"] != preflight["readiness"]["live_schema_hash"]
+            or manifest["hardware_readonly"] != hardware):
+        raise ValueError("Parent and supplement environments are not compatible")
+    done = completed_sensitivity_parameters(records)
+    names = {"innodb_buffer_pool_size", "innodb_io_capacity", "innodb_io_capacity_max", "sort_buffer_size"}
+    missing = sorted(names - done)
+    if not missing:
+        raise ValueError("No sensitivity parameters remain; do not repeat paid or free work")
+    audit = {"parent_run": str(parent), "completed_parameters": sorted(done),
+             "remaining_parameters": missing, "parent_new_measurements": len(records),
+             "parent_sha256": {name: hashlib.sha256((parent / name).read_bytes()).hexdigest()
+                               for name in ("manifest.json", "summary.json", "trials.jsonl")}}
+    return missing, choose_rate(records, 10), audit
 
 
 def measurement_stats(requests, plan, config, warmup=15, measurement=60):
@@ -196,13 +246,18 @@ def execute_trial(actuator, settings, spec, config, output, tables, table_size):
     return record
 
 
-def run_calibration(actuator, settings, app, output):
+def run_calibration(actuator, settings, app, output, complete_from=None):
     records, skipped = [], []
     started = time.monotonic()
     preflight = actuator.preflight()
     initial = dict(actuator.initial.config)
+    hardware = hardware_context()
+    parameters, explicit_rate, parent_audit = None, None, None
+    if complete_from is not None:
+        parameters, explicit_rate, parent_audit = supplement_plan(complete_from.resolve(), preflight, hardware)
+    max_trials = 21 if parameters is None else 2 * len(parameters) + 1
     # Abort before measurements if this particular screening protocol is not applicable.
-    sensitivity_plan(actuator.space, initial, 10)
+    sensitivity_plan(actuator.space, initial, 10, parameters)
     workload = app.benchmark.workload
     client = GenerationalRequests(settings, initial)
     try:
@@ -217,17 +272,22 @@ def run_calibration(actuator, settings, app, output):
                                            "innodb_page_size", "innodb_buffer_pool_instances"])
     manifest = {
         "mode": "zero_llm_calibration", "preflight": preflight, "data_preflight": checked,
+        "space": actuator.space.describe(), "memory_bytes": actuator.space.memory_bytes,
+        "fixed_resources": actuator.space.fixed_resources,
         "table_statistics_estimates": tables, "database_variables": variables,
-        "hardware_readonly": hardware_context(),
+        "hardware_readonly": hardware,
         "warmup_seconds": 15, "measurement_seconds": 60, "stream_seconds": 84,
-        "max_trials": 21, "max_wall_before_new_trial_seconds": 2100,
-        "baseline_plan": baseline_plan(), "sensitivity_order_seed": 20261124,
+        "max_trials": max_trials, "max_wall_before_new_trial_seconds": 2100,
+        "stage": "full" if parameters is None else "supplement_missing_sensitivity",
+        "parent_evidence": parent_audit,
+        "baseline_plan": baseline_plan() if parameters is None else [],
+        "sensitivity_parameters": parameters, "sensitivity_order_seed": 20261124,
         "request_semantics": "Point SELECT/UPDATE, autocommit, no added Sysbench",
         "data_snapshot_restored": False, "llm_calls": 0, **source_provenance(),
     }
     write_json(output / "manifest.json", manifest)
     def measure(spec, config):
-        if len(records) >= 21 or time.monotonic() - started > 2100:
+        if len(records) >= max_trials or time.monotonic() - started > 2100:
             raise TimeoutError("Calibration budget reached; no new trial")
         temp = output / "progress.tmp"
         write_json(temp, {"current_trial": spec, "completed_trials": len(records), "llm_calls": 0,
@@ -239,7 +299,7 @@ def run_calibration(actuator, settings, app, output):
             handle.write(json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n")
         return record
     blocked = set()
-    for spec in baseline_plan():
+    for spec in baseline_plan() if parameters is None else []:
         if spec["read_percent"] in blocked:
             skipped.append(spec)
             continue
@@ -248,12 +308,13 @@ def run_calibration(actuator, settings, app, output):
             if spec["kind"] == "repeat":
                 raise ValueError("Low-rate repeated baseline invalid; stop calibration")
             blocked.add(spec["read_percent"])  # do not escalate an already overloaded mix
-    rate = choose_rate(records, 10)
-    for spec in sensitivity_plan(actuator.space, initial, rate):
+    rate = choose_rate(records, 10) if explicit_rate is None else explicit_rate
+    for spec in sensitivity_plan(actuator.space, initial, rate, parameters):
         record = measure(spec, spec["config"])
         if not record["valid"] or not record["constraints_ok"]:
             raise ValueError("Sensitivity measurement invalid; restore and stop")
     return {"completed": True, "selected_write_heavy_rate": rate, "trials": len(records),
+            "stage": manifest["stage"], "parent_evidence": parent_audit,
             "skipped_pressure_probes": skipped, "invalid_trials": sum(not r["valid"] for r in records)}
 
 
@@ -263,6 +324,8 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
     parser.add_argument("--dedicated-instance", action="store_true")
+    parser.add_argument("--complete-from", type=Path,
+                        help="只补齐已恢复且因原时间预算停止的校准，另存新目录")
     args = parser.parse_args()
     if not args.dedicated_instance:
         parser.error("Requires dedicated instance; writes data and temporarily changes DB knobs")
@@ -292,7 +355,7 @@ def main():
     try:
         args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
         actuator = AgenticDBExecutor(app, space, Objective(), args.output, allow_mutations=True, local=True)
-        result.update(run_calibration(actuator, settings, app, args.output))
+        result.update(run_calibration(actuator, settings, app, args.output, complete_from=args.complete_from))
     except Exception as exc:
         result.update(completed=False, error=redact(str(exc)))
     finally:

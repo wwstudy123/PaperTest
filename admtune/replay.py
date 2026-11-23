@@ -136,11 +136,22 @@ def monitor(plan: ReplayPlan):
                                "note": "预声明联调阈值，非正式校准结果；不读取阶段标签"}
 
 
+def request_channels(plan, catalog):
+    """Encode the predeclared query universe once, never per scheduled request."""
+    return {
+        query: catalog.channel(query)
+        for query in (
+            Request(0, 0, "", operation, table, 1).template_sql
+            for operation in ("read", "write") for table in range(1, plan.tables + 1)
+        )
+    }
+
+
 def replay(plan: ReplayPlan, execute, output: Path, *, simulated: bool = True, guard=None, observer=None) -> dict:
     """execute 只由有界工作线程调用；调度不等待查询完成，过载明确丢弃。"""
     schedule = make_schedule(plan)
     catalog, detector, metadata = monitor(plan)
-    channel_by_query = {r.template_sql: catalog.channel(r.template_sql) for r in schedule}
+    channel_by_query = request_channels(plan, catalog)
     (output / "schedule.json").write_text(json.dumps([asdict(r) for r in schedule]))
     (output / "monitor.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2))
     replay_started_at = datetime.now(timezone.utc).isoformat()
