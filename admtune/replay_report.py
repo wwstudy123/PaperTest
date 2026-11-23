@@ -39,6 +39,9 @@ def export_replay(root: Path):
                     "scheduled_s": record["scheduled"], "emitted_s": record["emitted"],
                     "submitted": record["submitted"], "started_s": begin, "completed_s": end,
                     "ok": r.get("ok"), "error_type": r.get("error_type", ""),
+                    "affected_rows": r.get("rows"), "config_generation": r.get("config_generation"),
+                    "config_transition": r.get("config_transition"),
+                    "session_config_hash": r.get("session_config_hash"),
                     "emit_lag_ms": 1000 * record["emit_lag_seconds"],
                     "queue_wait_ms": None if begin is None else 1000 * (begin - record["emitted"]),
                     "service_ms": None if end is None else 1000 * (end - begin),
@@ -46,7 +49,8 @@ def export_replay(root: Path):
                     "scheduled_to_completion_ms": None if end is None else 1000 * (end - record["scheduled"])})
     fields = ["seq", "phase_label", "operation", "channel", "table", "row", "scheduled_s", "emitted_s",
               "submitted", "started_s", "completed_s", "ok", "error_type", "emit_lag_ms", "queue_wait_ms",
-              "service_ms", "e2e_ms", "scheduled_to_completion_ms"]
+              "service_ms", "e2e_ms", "scheduled_to_completion_ms", "affected_rows",
+              "config_generation", "config_transition", "session_config_hash"]
     write_csv(root / "requests.csv", raw, fields)
     aggregate, channels, events = [], [], []
     for item in windows:

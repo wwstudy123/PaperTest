@@ -271,7 +271,11 @@ class DynamicSession:
                 self._export_trials(records)
                 store.close()
             if llm:
-                (self.output / 'llm_usage.json').write_text(json.dumps({**llm.usage_summary(), 'budget': ledger.snapshot()}, indent=2))
+                usage = llm.usage_summary()
+                (self.output / 'llm_usage.json').write_text(json.dumps({**usage, 'budget': ledger.snapshot()}, indent=2))
+                columns = ['timestamp', 'operation', 'model', 'duration_s', 'input_tokens', 'output_tokens', 'total_tokens', 'cached_tokens']
+                write_csv(self.output / 'llm_usage.csv',
+                          [{k: r.get(k) for k in columns} for r in usage.get('records', [])], columns)
             if self.result is None:
                 self.result = {'error': self.error or 'Worker stopped before initialization', 'closed_loop_completed': False}
                 (self.output / 'dynamic_summary.json').write_text(json.dumps(self.result, indent=2))
@@ -299,6 +303,11 @@ class DynamicSession:
                          'prediction_std': (t.prediction or {}).get('observation_std'),
                          'measurement_start': t.metadata.get('measurement_start'),
                          'measurement_end': t.metadata.get('measurement_end'),
+                         'request_count': t.metadata.get('request_count'),
+                         'config_generation': t.metadata.get('config_generation'),
+                         'phase_guard_epoch': t.metadata.get('phase_guard', {}).get('epoch'),
+                         'phase_guard_status': t.metadata.get('phase_guard', {}).get('status'),
+                         'parent_config_json': json.dumps(t.metadata.get('parent_config'), sort_keys=True),
                          'config_json': json.dumps(t.config, sort_keys=True)})
         write_csv(self.output / 'dynamic_trials.csv', rows, list(rows[0]) if rows else ['trial_index'])
 
