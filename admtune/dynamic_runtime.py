@@ -11,7 +11,7 @@ import numpy as np
 from .contracts import fingerprint
 from .execution import Measurement, RecoveryFailed
 from .phase_safety import PhaseAdmissionError
-from .replay import MySQLRequests
+from .replay import MySQLRequests, query_semantics
 from .security import redact
 from tools.apply_db_config import apply_db_config, _format_mysql_sql_value
 from tools.rollback import create_config_backup
@@ -167,9 +167,10 @@ class DynamicExecutor:
                       if end - self.plan.window_seconds <= r['scheduled'] < end]
         return {'objective_key': 'p95_latency_ms:minimize', 'request_protocol': self.measurement_protocol,
                 'notes': 'Only scheduled SQL stream; lower measured latency is better.',
-                'sql_semantics': 'Primary-key point SELECT c / UPDATE k=k+1, autocommit; no joins or sorts.',
+                'sql_semantics': query_semantics(self.plan),
                 'observed_offered_qps': len(recent) / self.plan.window_seconds,
                 'observed_read_share': sum(r['operation'] == 'read' for r in recent) / max(1, len(recent)),
+                'observed_sort_share': sum(bool(r.get('top_k')) for r in recent) / max(1, len(recent)),
                 'runtime': self.actuator.diagnose().get('runtime_metrics', {}),
                 'config_generation': self.client.generation}
 

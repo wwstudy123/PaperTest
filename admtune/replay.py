@@ -58,9 +58,10 @@ class ReplayPlan:
             raise ValueError("High rate must exceed base rate")
         if type(self.read_percent) is not int or self.read_percent not in range(0, 101, 10):
             raise ValueError("Read percentage must be an integer multiple of ten")
-        if self.scenario != "steady" and self.read_percent != 50:
+        mixed = self.query_profile == "range-mixed"
+        if self.scenario != "steady" and self.read_percent != 50 and not mixed:
             raise ValueError("Explicit read percentage is supported only by steady replay")
-        if self.query_profile not in {"point", "range-scan", "range-sort"}:
+        if self.query_profile not in {"point", "range-scan", "range-sort", "range-mixed"}:
             raise ValueError("Unknown query profile")
         if type(self.range_rows) is not int or type(self.top_k) is not int:
             raise ValueError("Integer range and limit settings required")
@@ -68,13 +69,14 @@ class ReplayPlan:
             if self.range_rows != 0 or self.top_k != 0:
                 raise ValueError("Point replay must not silently use range settings")
         else:
-            if self.scenario != "steady" or self.read_percent != 100:
-                raise ValueError("Range probes currently require steady read-only streams")
+            allowed = {"composition", "steady"} if mixed else {"steady"}
+            if self.scenario not in allowed or self.read_percent != 100:
+                raise ValueError("Range streams require an explicit read-only supported scenario")
             if type(self.range_rows) is not int or not 1 <= self.range_rows <= self.table_size:
                 raise ValueError("Range must fit the declared contiguous dataset")
             if (type(self.top_k) is not int or
                     (self.query_profile == "range-scan" and self.top_k != 0) or
-                    (self.query_profile == "range-sort" and not 0 < self.top_k < self.range_rows)):
+                    (self.query_profile in {"range-sort", "range-mixed"} and not 0 < self.top_k < self.range_rows)):
                 raise ValueError("Explicit valid top-K required for sorting probes")
         if not math.isfinite(self.max_emit_lag_seconds) or self.max_emit_lag_seconds <= 0:
             raise ValueError("Finite positive emission lag bound required")
@@ -152,11 +154,40 @@ def planned_request(plan, seq, scheduled, phase, operation, table, row):
     return Request(seq, scheduled, phase, operation, table, row)
 
 
+def declared_requests(plan):
+    """预声明模板全集；混合只读负载共享扫描/排序通道，不读取未来计划。"""
+    if plan.query_profile == "range-mixed":
+        return [RangeRequest(0, 0, "", "read", table, 1, plan.range_rows, limit)
+                for limit in (0, plan.top_k) for table in range(1, plan.tables + 1)]
+    return [planned_request(plan, 0, 0, "", operation, table, 1)
+            for operation in ("read", "write") for table in range(1, plan.tables + 1)]
+
+
+def query_semantics(plan):
+    if plan.query_profile == "point":
+        return "Primary-key point SELECT c / UPDATE k=k+1, autocommit; no joins or sorts."
+    return (f"Read-only range aggregates, R={plan.range_rows}; "
+            f"profile={plan.query_profile}, top-K={plan.top_k}; sorting uses ORDER BY c,id. "
+            "One autocommit SQL per request; QPS is not Sysbench transaction TPS.")
+
+
 def make_schedule(plan: ReplayPlan) -> list[Request]:
     rng = random.Random(plan.seed)
     requests = []
     for second in range(plan.duration):
         phase_index = second // plan.phase_seconds
+        if plan.query_profile == "range-mixed":
+            scans = (plan.base_rate * (1 if phase_index == 1 else 9) // 10
+                     if plan.scenario == "composition" else plan.base_rate // 2)
+            limits = [0] * scans + [plan.top_k] * (plan.base_rate - scans)
+            rng.shuffle(limits)
+            for i, limit in enumerate(limits):
+                label = "ABA"[phase_index] if plan.expected_phase_count == 3 else "A"
+                requests.append(RangeRequest(
+                    len(requests), second + i / plan.base_rate, label, "read",
+                    rng.randint(1, plan.tables), rng.randint(1, plan.table_size - plan.range_rows + 1),
+                    plan.range_rows, limit))
+            continue
         transient = plan.scenario == "transient" and second in {plan.phase_seconds, 2 * plan.phase_seconds}
         high = (plan.scenario == "intensity" and phase_index == 1) or transient
         rate = plan.high_rate if high else plan.base_rate
@@ -175,16 +206,14 @@ def make_schedule(plan: ReplayPlan) -> list[Request]:
 
 def monitor(plan: ReplayPlan):
     # 模板全集来自预声明操作，不能扫描未来测试阶段来发现模板。
-    catalog = TemplateCatalog([
-        planned_request(plan, 0, 0, "", operation, table, 1).template_sql
-        for operation in ["read", "write"] for table in range(1, plan.tables + 1)
-    ], min_samples=1)
+    universe = declared_requests(plan)
+    catalog = TemplateCatalog([r.template_sql for r in universe], min_samples=1)
     channels = catalog.cluster_count + 1
     # 独立的预声明中性校准窗口；不使用测试阶段观测拟合归一化器或阈值。
     counts = [[0] * channels for _ in range(plan.slices)]
     slice_seconds = plan.window_seconds / plan.slices
-    for operation in ["read", "write"]:
-        ch = catalog.channel(planned_request(plan, 0, 0, "", operation, 1, 1).template_sql)
+    for request in (r for r in universe if r.table == 1):
+        ch = catalog.channel(request.template_sql)
         for row in counts:
             row[ch] += plan.base_rate * slice_seconds / 2
     calibration = Window(0, plan.window_seconds, counts)
@@ -203,10 +232,7 @@ def request_channels(plan, catalog):
     """Encode the predeclared query universe once, never per scheduled request."""
     return {
         query: catalog.channel(query)
-        for query in (
-            planned_request(plan, 0, 0, "", operation, table, 1).template_sql
-            for operation in ("read", "write") for table in range(1, plan.tables + 1)
-        )
+        for query in (r.template_sql for r in declared_requests(plan))
     }
 
 
@@ -397,6 +423,10 @@ def main():
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
     parser.add_argument("--scenario", choices=["composition", "intensity", "steady", "transient"], required=True)
     parser.add_argument("--phase-seconds", type=int, default=24)
+    parser.add_argument("--query-profile", choices=["point", "range-mixed"], default="point")
+    parser.add_argument("--table-size", type=int, default=100000)
+    parser.add_argument("--range-rows", type=int, default=0)
+    parser.add_argument("--top-k", type=int, default=0)
     parser.add_argument("--guard-acceptance", action="store_true",
                         help="保持 15+60 秒观测，验收阶段预算及跨阶段拒绝；不调参")
     parser.add_argument("--dedicated-instance", action="store_true")
@@ -404,7 +434,10 @@ def main():
     if not args.dedicated_instance:
         parser.error("Requires a dedicated experimental database; UPDATE changes data")
     try:
-        plan = ReplayPlan(scenario=args.scenario, phase_seconds=args.phase_seconds)
+        plan = ReplayPlan(scenario=args.scenario, phase_seconds=args.phase_seconds,
+                          query_profile=args.query_profile, table_size=args.table_size,
+                          read_percent=100 if args.query_profile == "range-mixed" else 50,
+                          range_rows=args.range_rows, top_k=args.top_k)
         if args.guard_acceptance:
             from .phase_safety import GuardAcceptance
             guard = GuardAcceptance(plan)
@@ -431,7 +464,7 @@ def main():
                     "created_at_utc": created_at, "initial_database_state": initial,
                     "environment_ids": target.get("admtune", {}),
                     "declared_hardware": target.get("target", {}).get("hardware", {}),
-                    "request_semantics": "单条 SELECT/UPDATE，autocommit；QPS 不是 Sysbench 事务 TPS",
+                    "request_semantics": query_semantics(plan),
                     "phase_guard_acceptance": args.guard_acceptance,
                     "phase_timing": guard.timing.report() if guard else None,
                     "warning": "Monitor-only low-rate replay, not Sysbench TPS or dynamic tuning"}

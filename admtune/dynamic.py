@@ -31,7 +31,7 @@ from .phase_safety import PhaseFence, PhaseTiming
 from .provenance import source_provenance
 from .real_execution import AgenticDBExecutor
 from .reflection import Reflector
-from .replay import ReplayPlan, replay
+from .replay import ReplayPlan, replay, monitor
 from .replay_report import export_replay, write_csv
 from .security import redact
 from tools.mysql_resize import wait_buffer_pool_ready
@@ -370,6 +370,9 @@ def main():
     parser.add_argument('--llm-calls', type=int, default=12)
     parser.add_argument('--llm-tokens', type=int, default=20000)
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--query-profile', choices=['point', 'range-mixed'], default='point')
+    parser.add_argument('--range-rows', type=int, default=0)
+    parser.add_argument('--top-k', type=int, default=0)
     args = parser.parse_args()
     if not args.dedicated_instance:
         parser.error('Dedicated recoverable experimental instance required')
@@ -384,7 +387,9 @@ def main():
                              apply_seconds=5, recovery_seconds=5,
                              proposal_seconds_per_phase=0 if args.backend == 'heuristic' else 30, trials_per_phase=6)
         timing.validate_phase(args.phase_seconds)
-        plan = ReplayPlan(phase_seconds=args.phase_seconds, seed=42 + args.seed)
+        plan = ReplayPlan(phase_seconds=args.phase_seconds, seed=42 + args.seed,
+                          query_profile=args.query_profile, range_rows=args.range_rows, top_k=args.top_k,
+                          read_percent=100 if args.query_profile == 'range-mixed' else 50)
     except ValueError as exc:
         parser.error(str(exc))
     load_dotenv(args.env_file, override=True)
@@ -417,6 +422,8 @@ def main():
                                   preflight['readiness']['live_schema_hash'], fingerprint({'plan': asdict(plan), 'timing': timing.report(),
                                   'objective': 'p95_latency_ms:minimize'}), space.key + ':dynamic-context-v1:' + fingerprint({
                                       'slices': plan.slices, 'window_seconds': plan.window_seconds, 'base_rate': plan.base_rate,
+                                      'query_profile': plan.query_profile, 'range_rows': plan.range_rows, 'top_k': plan.top_k,
+                                      'monitor': monitor(plan)[2],
                                   }))
         client = GenerationalRequests(asdict(actuator.settings), preflight['current_config'])
         client.preflight(plan)
