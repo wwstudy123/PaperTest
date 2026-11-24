@@ -435,6 +435,7 @@ def main():
     executor = PaperExecutor(app, space, Objective(), args.output / "runtime", allow_mutations=True, local=True)
     journal = None
     client = None
+    session_id = uuid.uuid4().hex
     result = {"status": "failed"}
     try:
         if args.resume:
@@ -451,7 +452,7 @@ def main():
                 executor.restore_initial()
         preflight = executor.preflight()
         extra = yaml.safe_load(args.target.read_text())["admtune"]
-        calibrated_benchmark = proof["manifest"]["benchmark"]
+        calibrated_benchmark = json.loads(json.dumps(proof["manifest"]["benchmark"]))
         expected = asdict(app.benchmark)
         calibrated_benchmark["workload"]["rand_type"] = "uniform"
         if (calibrated_benchmark != expected
@@ -500,7 +501,7 @@ def main():
                       "next_trial": journal.count + 1, "performed_trials": 0, "performed_llm_calls": 0}
         else:
             with (args.output / "sessions.jsonl").open("a") as f:
-                f.write(json.dumps({"event": "started", "at_utc": datetime.now(timezone.utc).isoformat(),
+                f.write(json.dumps({"event": "started", "session_id": session_id, "at_utc": datetime.now(timezone.utc).isoformat(),
                                     "count_before": journal.count, "until_trial": args.until_trial,
                                     **source_provenance()}) + "\n")
             ledger = DurableLedger(journal)
@@ -511,7 +512,7 @@ def main():
             client = LLMClient.from_env(dry_run=False)
             client.allow_fallback = False
             backend = EvidenceWireBackend(AgenticDBBackend(client, ledger, trace_dir=args.output / "llm_calls"),
-                                          audit_dir=args.output / f"evidence_session_{ledger.llm_calls:03d}")
+                                          audit_dir=args.output / "evidence" / session_id)
             runner = ContinuousRun(journal, executor, space, environment, args.output, backend, ledger)
             result = runner.run_until(args.until_trial)
     except Exception as exc:
@@ -535,7 +536,7 @@ def main():
         lock.close()
         if not args.check_only:
             with (args.output / "sessions.jsonl").open("a") as f:
-                f.write(json.dumps({"event": "finished", "at_utc": datetime.now(timezone.utc).isoformat(),
+                f.write(json.dumps({"event": "finished", "session_id": session_id, "at_utc": datetime.now(timezone.utc).isoformat(),
                                     "status": result.get("status")}) + "\n")
             atomic_json(args.output / "summary.json", result)
             atomic_json(args.output / "checksums.json", {
