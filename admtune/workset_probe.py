@@ -19,7 +19,7 @@ from .dynamic_runtime import GenerationalRequests
 from .live import load_space
 from .provenance import source_provenance
 from .real_execution import AgenticDBExecutor
-from .replay import ReplayPlan
+from .replay import ReplayPlan, planned_request
 from .replay_report import read_jsonl
 from .security import redact
 from tools.mysql_resize import wait_buffer_pool_ready
@@ -53,8 +53,23 @@ def check_preparation(preparation, settings, workload):
         raise ValueError("Validated isolated 4x2000000 workset and restore rehearsal required")
 
 
+def validate_analyze(rows):
+    expected = {f"{DB}.sbtest{i}" for i in range(1, 5)}
+    if (len(rows) != 4 or {r[0] for r in rows} != expected
+            or any(len(r) != 4 or r[1:] != ["analyze", "status", "OK"] for r in rows)):
+        raise ValueError("All four dedicated tables must finish statistics refresh")
+
+
 def run_probe(actuator, app, settings, output, records, preparation):
     preflight = actuator.preflight()
+    # Statistics immediately after a bulk load/physical restore can be stale.
+    # Refresh once, before all trials; never selectively between treatments.
+    analyze = actuator.db.query_rows("ANALYZE TABLE sbtest1,sbtest2,sbtest3,sbtest4;")
+    validate_analyze(analyze)
+    table_stats = actuator.db.query_rows(
+        "SELECT TABLE_NAME,TABLE_ROWS,DATA_LENGTH,INDEX_LENGTH FROM information_schema.tables "
+        "WHERE TABLE_SCHEMA=DATABASE() ORDER BY TABLE_NAME;"
+    )
     initial = actuator.initial.config
     conditions = actuator.db.show_variables(["innodb_flush_method", "innodb_buffer_pool_instances"])
     if str(conditions["innodb_flush_method"]).upper() != "O_DIRECT" or int(conditions["innodb_buffer_pool_instances"]) != 1:
@@ -62,6 +77,7 @@ def run_probe(actuator, app, settings, output, records, preparation):
     plan = probe_plan(actuator.space, initial)
     workload = app.benchmark.workload
     client = GenerationalRequests(settings, initial)
+    sanity = []
     try:
         client.preflight(ReplayPlan(tables=workload.tables, table_size=workload.table_size))
         samples = []
@@ -71,13 +87,30 @@ def run_probe(actuator, app, settings, output, records, preparation):
                 samples.append(cursor.fetchall())
         if fingerprint(samples) != preparation["logical_state"]["samples_sha256"]:
             raise ValueError("Prepared/restored dataset sample identity changed")
+        for spec in (plan[0], plan[5]):
+            query_plan = ReplayPlan(
+                scenario="steady", read_percent=100, query_profile=spec["query_profile"],
+                range_rows=spec["range_rows"], top_k=spec["top_k"],
+                tables=workload.tables, table_size=workload.table_size,
+            )
+            request = planned_request(query_plan, 0, 0, "preflight", "read", 1, 1)
+            with client.connect().cursor() as cursor:
+                cursor.execute("EXPLAIN FORMAT=JSON " + request.sql, request.parameters)
+                explain = json.loads(cursor.fetchone()[0])
+            started = time.monotonic()
+            result = client(request)  # one bounded structural check, not a performance label
+            sanity.append({"profile": spec["query_profile"], "explain": explain,
+                           "elapsed_seconds": time.monotonic() - started, "result": result})
     finally:
         client.close()
     manifest = {
         "mode": "workset_parameter_screening", "simulated": False, "llm_calls": 0,
+        "objective": "p95_latency_ms:minimize", "actuator_benchmark_not_executed": True,
         "preflight": preflight, "space": actuator.space.describe(),
         "memory_bytes": actuator.space.memory_bytes, "fixed_resources": actuator.space.fixed_resources,
         "hardware": hardware_context(), "fixed_instance_conditions": conditions,
+        "pre_measurement_analyze": analyze, "table_statistics_estimates_after_analyze": table_stats,
+        "preflight_query_checks_not_performance_labels": sanity,
         "preparation_source_revision": preparation["git_revision"],
         "snapshot_manifest_sha256": preparation["snapshot_manifest_sha256"],
         "snapshot_restore_verified_before_run": True, "reset_snapshot_between_trials": False,

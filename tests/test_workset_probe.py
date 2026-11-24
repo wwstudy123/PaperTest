@@ -11,7 +11,7 @@ from unittest.mock import Mock, MagicMock, patch
 from admtune.replay import ReplayPlan, Request, RangeRequest, make_schedule, monitor, request_channels, MySQLRequests
 from admtune.dynamic_runtime import GenerationalRequests
 from admtune.space import Space, Knob
-from admtune.workset_probe import probe_plan, check_preparation, main
+from admtune.workset_probe import probe_plan, check_preparation, validate_analyze, main
 from tools.prepare_workset_v2 import DB
 
 
@@ -25,6 +25,14 @@ def space():
 
 
 class WorksetProbeTests(unittest.TestCase):
+    def test_statistics_refresh_covers_exactly_the_dedicated_tables(self):
+        rows = [[f"{DB}.sbtest{i}", "analyze", "status", "OK"] for i in range(1, 5)]
+        validate_analyze(rows)
+        for changed in (rows[:-1], [*rows[:-1], rows[0]],
+                        [*rows[:-1], [f"{DB}.sbtest4", "analyze", "status", "Failed"]]):
+            with self.assertRaises(ValueError):
+                validate_analyze(changed)
+
     def test_point_request_metadata_and_bindings_are_unchanged(self):
         r = Request(0, 1, "A", "read", 1, 3)
         self.assertEqual(asdict(r), {"seq": 0, "scheduled": 1, "phase": "A",
