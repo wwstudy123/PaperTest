@@ -44,3 +44,53 @@ GP 无可试候选时不放宽筛选去伪造收益，可进行明确标记的�
 全局真实试验上限 100、LLM 尝试上限 40、token/未知用量预留上限 160000；
 这些是安全上限，不表示必须花完。候选批量生成、阶段性反思，避免每次测量都调用模型。
 先导校准记录不作为正式搜索训练集或正式比较结果。
+
+## 连续序列的固定细节
+
+- 启动至少六条有效观测后拟合 GP；每批最多八个 LLM 候选。
+- 初始参考固定于第 10、20、30、40、60、70、80、90 次；第 50、100 次为独立检查点复测。
+- 第 5、15、25、35、45、55、65、75、85、95 次为预声明预测审计（有未测候选时执行）。
+- 正常搜索按 LCB 性能准入和 UCB 改进选择；没有合格新候选时测量 incumbent，
+  用来估计噪声，不把相同配置的波动接受为新配置收益。连续三次无效会停止诊断。
+- 所有试验结束后恢复共同初始配置；算法的推荐父配置独立持久化，不依赖数据库停在最优配置。
+- 每十条记录统一反思新增证据；历史文字供后续批次检索。静态上下文恒定，不能据此声称动态机制已有效。
+- 干净停机后的空闲时间不计为活动调优时间；原始 UTC 会话记录保留真实间隔。
+  未知中断为每条缺失结果保守预留 600 秒，不将该预留称为准确耗时。
+- 模型/端点/思考开关、执行代码、依赖、硬件配额、配置/数据/参数空间、分布和随机种子被冻结。
+  允许更新结果 Markdown、图和 CSV，但不允许在同一序列中偷偷修改算法。密钥可以轮换，不写入账本。
+
+## 新建与续接命令
+
+以服务器仓库根目录运行；下列本地私有配置不提交 Git。
+
+```bash
+# 新序列前恢复同一数据快照，仅创建时执行；先确认校准通过。
+python -m tools.restore_workset_v2 \
+  --audit-dir /root/PaperTest/runs/continuous-restore-001 --dedicated-instance
+
+python -m admtune.continuous \
+  --target configs/local/workset-v2-target.yaml \
+  --benchmark configs/local/continuous-uniform-001.yaml \
+  --knobs configs/local/workset-v2-knobs.yaml \
+  --calibration runs/discrimination-001 \
+  --restore-audit runs/continuous-restore-001/restore.json \
+  --output runs/continuous-uniform-001 --until-trial 50 \
+  --dedicated-instance --allow-paid-llm
+```
+
+续接时不另建输出目录、不重新生成数据、不清空经验库：
+
+```bash
+python -m admtune.continuous \
+  --target configs/local/workset-v2-target.yaml \
+  --benchmark configs/local/continuous-uniform-001.yaml \
+  --knobs configs/local/workset-v2-knobs.yaml \
+  --calibration runs/discrimination-001 \
+  --output runs/continuous-uniform-001 \
+  --resume --until-trial 51 --dedicated-instance --allow-paid-llm
+```
+
+将累计终点改成 52 或 100 即只执行尚缺的试验。
+移除 `--allow-paid-llm` 并加 `--check-only` 可检查续接，不执行新的压测或 LLM 调用。
+数据库配置实例锁覆盖整次调用；中断时有未完成编号会标为未知结果并保留，
+只有确认没有遗留 Sysbench 进程才恢复已校验的初始配置，绝不重复该编号。

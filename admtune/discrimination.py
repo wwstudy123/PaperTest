@@ -50,6 +50,8 @@ def main():
     load_dotenv(override=True)
     app = load_app_config(project_root=Path(__file__).resolve().parent.parent,
                           target_path=a.target, benchmark_path=a.benchmark, knobs_path=a.knobs, dry_run_override=False)
+    if app.target.dbms != "mysql" or app.target.mysql.host not in {"127.0.0.1", "localhost"}:
+        p.error("Dedicated local MySQL required")
     if app.benchmark.workload.script_path != "/usr/share/sysbench/oltp_read_only.lua":
         p.error("Read-only native Sysbench required")
     if app.benchmark.workload.duration < 60 or app.benchmark.workload.warmup_time < 15:
