@@ -111,7 +111,8 @@ def curve_rows(method, records, measurements, *, seed):
         rows.append({
             "method": method, "seed": seed, "trial": step, "kind": kind, "valid": valid,
             "tps": record["value"], "p95_ms": metadata.get("p95_latency_ms"),
-            "ended_seconds": None if observation is None else observation["metadata"]["ended_seconds"],
+            "ended_seconds": metadata.get("ended_seconds",
+                                          None if observation is None else observation["metadata"]["ended_seconds"]),
             "best_tps": None if best is None else best["value"],
             "best_config_p95_ms": None if best is None else best["metadata"].get("p95_latency_ms"),
             "benchmark_log": metadata.get("benchmark_log"),
