@@ -88,7 +88,7 @@ def create(default_dir, admtune_dir, output):
             ax.scatter(x, y, color="#1565c0", s=19, zorder=3)
             xmax = max(float(r[xfield]) / scale for r in trows)
             ax.hlines(references[metric], 0, xmax, colors="#5d6672", linestyles="--",
-                      linewidth=1.6, label=f"Default median ({len(valid_d)} measurements)")
+                      linewidth=1.6, label=f"Default initial-config median (n={len(valid_d)})")
             ax.scatter([float(r[xfield]) / scale for r in verification],
                        [float(r[raw]) for r in verification], s=65, marker="D",
                        color="#d77619", edgecolors="white", linewidths=.7,
@@ -114,12 +114,14 @@ def create(default_dir, admtune_dir, output):
             markersize=4.5, linewidth=1.1, label="ADMTune (static pilot)")
     xmax = max(int(r["trial"]) for r in trows)
     ax.hlines(references["best_tps"], 0, xmax, color=METHOD_STYLE["Default"][0],
-              linestyle="--", linewidth=1, label=f"Default (median, n={len(valid_d)})")
+              linestyle="--", linewidth=1, label=f"Default (initial, n={len(valid_d)})")
     ax.scatter([int(r["trial"]) for r in verification], [float(r["tps"]) for r in verification],
                color="#d77619", marker="D", s=30, edgecolors="white", linewidths=.5,
                label="Final verification (not search)", zorder=4)
     ax.set(xlabel="# Workload Replays", ylabel="Throughput (TPS)",
            title="SYSBENCH - OLTP (read-only)", xlim=(0, xmax + .35))
+    top = max(references["best_tps"], *(float(r["tps"]) for r in trows if r["valid"] == "True"))
+    ax.set_ylim(0, top * 1.12)  # 不放大不到百分之一的波动，并避免顶部标记裁切。
     from matplotlib.ticker import MaxNLocator
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.grid(color="#d0d0d0", linewidth=.5, alpha=.7)

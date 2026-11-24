@@ -1,0 +1,7 @@
+method,status,curve_data_created
+ADMTune,measured_pilot,True
+GPTuner,not_run,False
+AgentTune,not_run,False
+CDBTune,not_run,False
+MySQLTuner,not_run,False
+Default,measured_pilot,True

@@ -1,0 +1,9 @@
+method,seed,trial,kind,valid,tps,p95_ms,ended_seconds,best_tps,best_config_p95_ms,benchmark_log,config_json
+Default,0,1,default,True,4036.87,66.84,77.66654291003942,4036.87,66.84,benchmark-1.log,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
+Default,0,2,default,True,4062.69,66.84,155.0406287163496,4062.69,66.84,benchmark-2.log,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
+Default,0,3,default,True,4042.65,66.84,232.44803766906261,4062.69,66.84,benchmark-3.log,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
+ADMTune,0,1,baseline,True,4011.63,66.84,77.88200710713863,4011.63,66.84,benchmark-1.log,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
+ADMTune,0,2,startup,True,4002.77,66.84,170.58610767871141,4011.63,66.84,benchmark-2.log,"{""innodb_buffer_pool_size"": 2147483648, ""innodb_io_capacity"": 500, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
+ADMTune,0,3,startup,True,4018.51,66.84,248.6777956262231,4018.51,66.84,benchmark-3.log,"{""innodb_buffer_pool_size"": 2147483648, ""innodb_io_capacity"": 800, ""innodb_io_capacity_max"": 3000, ""sort_buffer_size"": 262144}"
+ADMTune,0,4,startup,True,4013.24,66.84,326.8641873821616,4018.51,66.84,benchmark-4.log,"{""innodb_buffer_pool_size"": 4294967296, ""innodb_io_capacity"": 500, ""innodb_io_capacity_max"": 2500, ""sort_buffer_size"": 262144}"
+ADMTune,0,5,verification,True,4035.45,66.84,404.7821188122034,4018.51,66.84,benchmark-5.log,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
