@@ -145,9 +145,9 @@ class Journal:
 
 
 class DurableLedger(Ledger):
-    def __init__(self, journal):
-        super().__init__(Limits(trials=100, wall_seconds=21600, llm_calls=40,
-                                llm_tokens=160000, recovery_reserve_seconds=180))
+    def __init__(self, journal, *, limits=None):
+        super().__init__(limits or Limits(trials=100, wall_seconds=21600, llm_calls=40,
+                                         llm_tokens=160000, recovery_reserve_seconds=180))
         self.journal = journal
         old = journal.get("ledger", {})
         self.base_elapsed = old.get("elapsed_seconds", 0)
@@ -280,6 +280,7 @@ class ContinuousRun:
         self.ledger.ensure_time(self.executor.estimated_trial_seconds)
         self.fit()
         kind, config, decision = self.choose(seq)
+        self.ledger.ensure_time(self.executor.estimated_trial_seconds)
         config = self.space.merge(config, {})
         prediction = asdict(self.gp.predict([self.space.encode(config) + [0.0]])[0]) if self.gp.fitted else None
         submitted = self.journal.reserve({"kind": kind, "config": config,

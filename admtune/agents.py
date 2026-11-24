@@ -22,6 +22,7 @@ PROMPTS = {
     ),
     "pruner": (
         "你负责建议优先搜索范围。selected 中每个参数必须且只能出现一次。硬边界与步长不能改变。"
+        "ranges 的键集合必须与 selected 完全一致；未选中的参数必须省略，不能用 null 占位。"
         "数值上下界必须位于 catalog 边界内，且与 lower 加整数倍 step 对齐；单位沿用目录，"
         "字节值必须输出数字，不能输出 GB 等字符串。枚举值只能来自目录。"
         '仅返回一个 JSON 对象：{"ranges":{"参数名":{"lower":数值或null,"upper":数值或null,"choices":[],"special":[]}}}。'
@@ -190,7 +191,8 @@ class Team:
         ):
             raise ValueError("Invalid selected parameter set")
         self.selected = selected
-        output = self.backend.complete("pruner", {**payload, "selected": selected})
+        output = self.backend.complete("pruner", {**payload, "selected": selected,
+            "catalog": [k for k in payload["catalog"] if k["name"] in selected]})
         self.set_ranges(output.get("ranges"))
 
     def set_ranges(self, ranges: dict):
