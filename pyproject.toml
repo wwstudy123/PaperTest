@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 replay = ["PyMySQL[rsa]>=1.1,<2"]
+plots = ["matplotlib>=3.8,<3.10", "contourpy>=1.2,<1.4"]
 
 [project.scripts]
 agenticdb = "main:main"
