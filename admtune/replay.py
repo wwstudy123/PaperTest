@@ -376,7 +376,7 @@ class MySQLRequests:
                 rows = len(result_rows)
                 if isinstance(request, RangeRequest):
                     request.validate_result(result_rows)
-                    return {"rows": 1, "result_fingerprint": fingerprint(
+                    return {"rows": 1, "aggregate_count": int(result_rows[0][0]), "result_fingerprint": fingerprint(
                         [[str(v) for v in row] for row in result_rows])}
             else:
                 rows = cursor.rowcount

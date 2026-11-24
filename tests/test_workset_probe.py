@@ -90,6 +90,7 @@ class WorksetProbeTests(unittest.TestCase):
         r = RangeRequest(0, 0, "A", "read", 1, 5, 32768, 8192)
         result = client(r)
         self.assertEqual(result["rows"], 1)
+        self.assertEqual(result["aggregate_count"], 8192)
         self.assertEqual(len(result["result_fingerprint"]), 64)
         cursor.execute.assert_called_once_with(r.sql, r.parameters)
         cursor.fetchall.return_value = [(10, Decimal("9"))]
