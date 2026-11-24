@@ -1,0 +1,9 @@
+trial,distribution,candidate,valid,tps,p95_ms
+1,special,False,True,4023.46,66.84
+2,special,True,True,3982.05,66.84
+3,special,False,True,3960.54,68.05
+4,uniform,False,True,2441.78,17.95
+5,uniform,True,True,3411.63,66.84
+6,uniform,False,True,2431.1,18.28
+7,uniform,True,True,3336.18,66.84
+8,uniform,False,True,2418.21,18.28
