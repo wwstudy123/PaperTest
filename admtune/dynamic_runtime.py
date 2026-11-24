@@ -53,10 +53,11 @@ class GenerationalRequests(MySQLRequests):
                     if int(cursor.fetchone()[0]) != int(config[name]):
                         raise ValueError('Session parameter readback mismatch')
             self.local.connection, self.local.generation = conn, generation
-        rows = super().__call__(request)
+        result = super().__call__(request)
+        details = result if isinstance(result, dict) else {"rows": result}
         with self.lock:
             transition = transition or self.changing or generation != self.generation
-        return {'rows': rows, 'config_generation': generation, 'config_transition': transition,
+        return {**details, 'config_generation': generation, 'config_transition': transition,
                 'session_config_hash': fingerprint(config)}
 
 

@@ -5,10 +5,17 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools.prepare_workset_v2 import cold_copy, tree_hashes, file_hash, validate_identity, main
+from tools.prepare_workset_v2 import cold_copy, tree_hashes, file_hash, validate_identity, main, prepare_command
 
 
 class WorksetPrepareTests(unittest.TestCase):
+    def test_lua_size_options_are_explicit_and_password_is_not_in_argv(self):
+        command = prepare_command(Path("/private/sysbench.conf"))
+        self.assertIn("--tables=4", command)
+        self.assertIn("--table-size=2000000", command)
+        self.assertIn("--rand-seed=42", command)
+        self.assertFalse(any("password" in arg for arg in command))
+
     def test_cold_copy_verifies_nested_files_and_preserves_original(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder);source = root / "data";source.mkdir()

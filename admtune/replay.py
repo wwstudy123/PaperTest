@@ -39,6 +39,9 @@ class ReplayPlan:
     seed: int = 42
     max_emit_lag_seconds: float = 0.5
     read_percent: int = 50
+    query_profile: str = "point"
+    range_rows: int = 0
+    top_k: int = 0
 
     def __post_init__(self):
         if self.scenario not in {"composition", "intensity", "steady", "transient"}:
@@ -57,6 +60,22 @@ class ReplayPlan:
             raise ValueError("Read percentage must be an integer multiple of ten")
         if self.scenario != "steady" and self.read_percent != 50:
             raise ValueError("Explicit read percentage is supported only by steady replay")
+        if self.query_profile not in {"point", "range-scan", "range-sort"}:
+            raise ValueError("Unknown query profile")
+        if type(self.range_rows) is not int or type(self.top_k) is not int:
+            raise ValueError("Integer range and limit settings required")
+        if self.query_profile == "point":
+            if self.range_rows != 0 or self.top_k != 0:
+                raise ValueError("Point replay must not silently use range settings")
+        else:
+            if self.scenario != "steady" or self.read_percent != 100:
+                raise ValueError("Range probes currently require steady read-only streams")
+            if type(self.range_rows) is not int or not 1 <= self.range_rows <= self.table_size:
+                raise ValueError("Range must fit the declared contiguous dataset")
+            if (type(self.top_k) is not int or
+                    (self.query_profile == "range-scan" and self.top_k != 0) or
+                    (self.query_profile == "range-sort" and not 0 < self.top_k < self.range_rows)):
+                raise ValueError("Explicit valid top-K required for sorting probes")
         if not math.isfinite(self.max_emit_lag_seconds) or self.max_emit_lag_seconds <= 0:
             raise ValueError("Finite positive emission lag bound required")
         if self.duration * self.high_rate > 100000:
@@ -90,6 +109,48 @@ class Request:
     def template_sql(self):
         return self.sql.replace("%s", "1")
 
+    @property
+    def parameters(self):
+        return (self.row,)
+
+
+@dataclass(frozen=True)
+class RangeRequest(Request):
+    range_rows: int
+    top_k: int = 0
+
+    def __post_init__(self):
+        if (self.operation != "read" or type(self.range_rows) is not int or self.range_rows < 1
+                or type(self.top_k) is not int or not 0 <= self.top_k < self.range_rows):
+            raise ValueError("Invalid read-only range request")
+
+    @property
+    def sql(self):
+        if not self.top_k:
+            return (f"SELECT COUNT(*),SUM(k),SUM(OCTET_LENGTH(c)) FROM sbtest{self.table} "
+                    "WHERE id BETWEEN %s AND %s")
+        # SUM(k) depends on which rows survive LIMIT: ORDER BY cannot simply be
+        # discarded as it could be for a derived table consumed only by COUNT.
+        return (f"SELECT COUNT(*),SUM(k) FROM (SELECT k FROM sbtest{self.table} "
+                f"WHERE id BETWEEN %s AND %s ORDER BY c,id LIMIT {self.top_k}) AS chosen")
+
+    @property
+    def parameters(self):
+        return (self.row, self.row + self.range_rows - 1)
+
+    def validate_result(self, rows):
+        count = self.top_k or self.range_rows
+        columns = 2 if self.top_k else 3
+        if (len(rows) != 1 or len(rows[0]) != columns or rows[0][0] != count
+                or any(value is None for value in rows[0])):
+            raise ValueError("Incomplete range aggregate or unexpected result shape")
+
+
+def planned_request(plan, seq, scheduled, phase, operation, table, row):
+    if operation == "read" and plan.query_profile != "point":
+        return RangeRequest(seq, scheduled, phase, operation, table, row, plan.range_rows, plan.top_k)
+    return Request(seq, scheduled, phase, operation, table, row)
+
 
 def make_schedule(plan: ReplayPlan) -> list[Request]:
     rng = random.Random(plan.seed)
@@ -105,15 +166,17 @@ def make_schedule(plan: ReplayPlan) -> list[Request]:
         rng.shuffle(operations)
         for i, operation in enumerate(operations):
             label = "ABA"[phase_index] if plan.expected_phase_count == 3 else ("B" if transient else "A")
-            requests.append(Request(len(requests), second + i / rate, label, operation,
-                                    rng.randint(1, plan.tables), rng.randint(1, plan.table_size)))
+            maximum = (plan.table_size - plan.range_rows + 1
+                       if operation == "read" and plan.query_profile != "point" else plan.table_size)
+            requests.append(planned_request(plan, len(requests), second + i / rate, label, operation,
+                                            rng.randint(1, plan.tables), rng.randint(1, maximum)))
     return requests
 
 
 def monitor(plan: ReplayPlan):
     # 模板全集来自预声明操作，不能扫描未来测试阶段来发现模板。
     catalog = TemplateCatalog([
-        Request(0, 0, "", operation, table, 1).template_sql
+        planned_request(plan, 0, 0, "", operation, table, 1).template_sql
         for operation in ["read", "write"] for table in range(1, plan.tables + 1)
     ], min_samples=1)
     channels = catalog.cluster_count + 1
@@ -121,7 +184,7 @@ def monitor(plan: ReplayPlan):
     counts = [[0] * channels for _ in range(plan.slices)]
     slice_seconds = plan.window_seconds / plan.slices
     for operation in ["read", "write"]:
-        ch = catalog.channel(Request(0, 0, "", operation, 1, 1).template_sql)
+        ch = catalog.channel(planned_request(plan, 0, 0, "", operation, 1, 1).template_sql)
         for row in counts:
             row[ch] += plan.base_rate * slice_seconds / 2
     calibration = Window(0, plan.window_seconds, counts)
@@ -141,7 +204,7 @@ def request_channels(plan, catalog):
     return {
         query: catalog.channel(query)
         for query in (
-            Request(0, 0, "", operation, table, 1).template_sql
+            planned_request(plan, 0, 0, "", operation, table, 1).template_sql
             for operation in ("read", "write") for table in range(1, plan.tables + 1)
         )
     }
@@ -307,9 +370,14 @@ class MySQLRequests:
         if not hasattr(self.local, "connection"):
             self.local.connection = self.connect()
         with self.local.connection.cursor() as cursor:
-            cursor.execute(request.sql, (request.row,))
+            cursor.execute(request.sql, request.parameters)
             if request.operation == "read":
-                rows = len(cursor.fetchall())
+                result_rows = cursor.fetchall()
+                rows = len(result_rows)
+                if isinstance(request, RangeRequest):
+                    request.validate_result(result_rows)
+                    return {"rows": 1, "result_fingerprint": fingerprint(
+                        [[str(v) for v in row] for row in result_rows])}
             else:
                 rows = cursor.rowcount
             if rows != 1:

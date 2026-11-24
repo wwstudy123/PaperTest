@@ -22,7 +22,14 @@ from admtune.security import redact
 
 
 TABLES, TABLE_SIZE, PORT = 4, 2_000_000, 3308
-DB = "admtune_workset_v2"
+DB = "admtune_workset_v2_full"
+
+
+def prepare_command(binary_config):
+    # Lua script options in sysbench 1.0.20 must be explicit here. Keeping only
+    # C/driver options in the private file prevents silent Lua defaults.
+    return ["sysbench", f"--config-file={binary_config}", "/usr/share/sysbench/oltp_read_write.lua",
+            f"--tables={TABLES}", f"--table-size={TABLE_SIZE}", "--threads=4", "--rand-seed=42", "prepare"]
 
 
 def file_hash(path):
@@ -73,6 +80,8 @@ def validate_identity(identity, datadir):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dedicated-instance", action="store_true")
+    parser.add_argument("--resume-failed-lua-options", action="store_true",
+                        help="只修复首次 Lua 规模选项失效；保留原小库并创建新库")
     parser.add_argument("--root", type=Path, default=Path("/root/PaperTest"))
     parser.add_argument("--base", type=Path, default=Path("/root/autodl-tmp/admtune-mysql-v2"))
     parser.add_argument("--binary", type=Path, default=Path(
@@ -82,8 +91,17 @@ def main():
         parser.error("Explicit dedicated experimental instance authorization required")
     import pymysql
     base, root = args.base.resolve(), args.root.resolve()
-    if not args.base.is_absolute() or not args.root.is_absolute() or base.exists():
+    resume = args.resume_failed_lua_options
+    if not args.base.is_absolute() or not args.root.is_absolute() or (base.exists() and not resume):
         parser.error("Absolute paths and an unused isolated base directory required")
+    previous = None
+    if resume:
+        previous = json.loads((base / "preparation.json").read_text())
+        if (previous.get("completed") or previous.get("error") != "Incomplete generated table"
+                or previous.get("step") != "generate_sysbench_4x2000000"
+                or previous.get("database") != "admtune_workset_v2"
+                or (base / "preparation-attempt-001.json").exists()):
+            parser.error("Only the preserved first Lua-options failure can be resumed")
     if shutil.disk_usage(base.parent).free < 20 * 1024**3:
         parser.error("At least 20 GiB free space required before preparation")
     envfile = root / ".env"
@@ -95,15 +113,28 @@ def main():
     old = yaml.safe_load((root / "configs/local/autodl-smoke-target.yaml").read_text())
     old_config = Path(old["mysql"]["config_path"])
     old_config_hash = file_hash(old_config)
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", PORT))
+    if not resume:
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", PORT))
     os.umask(0o077)
-    base.mkdir(mode=0o700)
-    for name in ("data", "binlog", "logs", "files"):
-        (base / name).mkdir(mode=0o700)
-    password = dotenv_values(envfile).get("ADMTUNE_MYSQL_V2_PASSWORD") or secrets.token_urlsafe(32)
+    if not resume:
+        base.mkdir(mode=0o700)
+        for name in ("data", "binlog", "logs", "files"):
+            (base / name).mkdir(mode=0o700)
+    existing_password = dotenv_values(envfile).get("ADMTUNE_MYSQL_V2_PASSWORD")
+    if resume and not existing_password:
+        parser.error("Existing isolated instance credential required")
+    password = existing_password or secrets.token_urlsafe(32)
     state = {"completed": False, "llm_calls": 0, "port": PORT, "database": DB,
              "tables": TABLES, "table_size": TABLE_SIZE, **source_provenance()}
+    if resume:
+        shutil.copy2(base / "preparation.json", base / "preparation-attempt-001.json")
+        for name in ("sysbench-private.conf", "logs/prepare.log"):
+            path = base / name
+            if path.exists():
+                shutil.copy2(path, path.with_name(path.stem + "-attempt-001" + path.suffix))
+        state["retained_failed_attempt_sha256"] = file_hash(base / "preparation-attempt-001.json")
+        state["retained_partial_database"] = previous["database"]
     def step(name):
         state["step"] = name
         state["updated_at_utc"] = datetime.now(timezone.utc).isoformat()
@@ -114,7 +145,7 @@ def main():
             raise RuntimeError(redact((r.stderr or r.stdout).replace(password, "<redacted>"))[-3000:])
         return r.stdout
     config = base / "my.cnf"
-    config.write_text(f"""[mysqld]
+    config_text = f"""[mysqld]
 user=root
 basedir={args.binary.parent}
 datadir={base}/data
@@ -143,7 +174,12 @@ max_binlog_size=134217728
 binlog_expire_logs_seconds=600
 character-set-server=utf8mb4
 collation-server=utf8mb4_0900_ai_ci
-""")
+"""
+    if resume:
+        if config.read_text() != config_text:
+            parser.error("Existing isolated instance configuration differs; refusing resume")
+    else:
+        config.write_text(config_text)
     config.chmod(0o600)
     def connect(*, blank=False):
         return pymysql.connect(unix_socket=str(base / "mysql.sock"), user="root",
@@ -195,12 +231,23 @@ collation-server=utf8mb4_0900_ai_ci
                     "table_statistics_estimates": sizes,
                     "estimated_data_index_bytes": sum(int(r[1]) + int(r[2]) for r in sizes)}
     try:
-        step("initialize_isolated_instance")
-        run([str(args.binary / "mysqld"), f"--defaults-file={config}", "--initialize-insecure"])
-        run([str(args.binary / "mysqld"), f"--defaults-file={config}", "--daemonize"])
-        with connect(blank=True) as c, c.cursor() as q:
-            q.execute("ALTER USER 'root'@'localhost' IDENTIFIED BY %s", (password,))
-            q.execute(f"CREATE DATABASE {DB} CHARACTER SET utf8mb4")
+        if not resume:
+            step("initialize_isolated_instance")
+            run([str(args.binary / "mysqld"), f"--defaults-file={config}", "--initialize-insecure"])
+            run([str(args.binary / "mysqld"), f"--defaults-file={config}", "--daemonize"])
+            with connect(blank=True) as c, c.cursor() as q:
+                q.execute("ALTER USER 'root'@'localhost' IDENTIFIED BY %s", (password,))
+                q.execute(f"CREATE DATABASE {DB} CHARACTER SET utf8mb4")
+        else:
+            step("resume_into_new_database_preserving_partial")
+            with connect() as c, c.cursor() as q:
+                q.execute("SELECT VERSION(),@@port,@@datadir,@@innodb_flush_method,"
+                          "@@innodb_flush_log_at_trx_commit,@@sync_binlog,@@innodb_doublewrite")
+                validate_identity(q.fetchone(), base / "data")
+                q.execute("SELECT COUNT(*),MIN(id),MAX(id) FROM admtune_workset_v2.sbtest1")
+                if tuple(q.fetchone()) != (10000, 1, 10000):
+                    raise ValueError("Partial dataset differs from the captured failure")
+                q.execute(f"CREATE DATABASE {DB} CHARACTER SET utf8mb4")
         envfile.chmod(0o600)
         set_key(str(envfile), "ADMTUNE_MYSQL_V2_PASSWORD", password)
         envfile.chmod(0o600)
@@ -218,8 +265,7 @@ rand-seed=42
 """)
         private.chmod(0o600)
         step("generate_sysbench_4x2000000")
-        generated = run(["sysbench", f"--config-file={private}", "/usr/share/sysbench/oltp_read_write.lua",
-                         "prepare"], timeout=1200)
+        generated = run(prepare_command(private), timeout=1200)
         (base / "logs/prepare.log").write_text(generated.replace(password, "<redacted>"))
         before = logical_state()
         step("clean_shutdown_and_snapshot")

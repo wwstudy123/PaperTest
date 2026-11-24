@@ -160,7 +160,7 @@ def process_sample(pid):
 def status_sample(db):
     names = ["Innodb_buffer_pool_reads", "Innodb_buffer_pool_read_requests",
              "Innodb_data_reads", "Innodb_data_writes", "Innodb_os_log_written",
-             "Sort_rows", "Created_tmp_disk_tables"]
+             "Sort_rows", "Sort_merge_passes", "Sort_scan", "Created_tmp_disk_tables"]
     return {k: int(v) for k, v in db.show_status(names).items() if v is not None}
 
 
@@ -201,7 +201,9 @@ def prepare(actuator, config):
 def execute_trial(actuator, settings, spec, config, output, tables, table_size):
     plan = ReplayPlan(scenario="steady", phase_seconds=28, base_rate=spec["rate"],
                       high_rate=spec["rate"] + 10, read_percent=spec["read_percent"],
-                      tables=tables, table_size=table_size, seed=spec["seed"])
+                      tables=tables, table_size=table_size, seed=spec["seed"],
+                      query_profile=spec.get("query_profile", "point"),
+                      range_rows=spec.get("range_rows", 0), top_k=spec.get("top_k", 0))
     folder = output / spec["name"]
     folder.mkdir(mode=0o700, exist_ok=False)
     resize_checks = prepare(actuator, config)  # no live request workers during a change
@@ -220,7 +222,8 @@ def execute_trial(actuator, settings, spec, config, output, tables, table_size):
     if after_process["start_ticks"] != before_process["start_ticks"]:
         raise ValueError("MySQL process changed during trial")
     actuator._verify(config, actuator.initial.invariants)
-    metrics = measurement_stats(read_jsonl(folder / "requests.jsonl"), plan, config)
+    requests = read_jsonl(folder / "requests.jsonl")
+    metrics = measurement_stats(requests, plan, config)
     if not stream["complete"]:
         metrics["value_p95_ms"] = None
     elapsed = after_process["at"] - before_process["at"]
@@ -239,6 +242,9 @@ def execute_trial(actuator, settings, spec, config, output, tables, table_size):
             "write_bytes": after_process["write_bytes"] - before_process["write_bytes"],
         },
         "database_counters_full_stream": delta,
+        "query_result_signature": fingerprint([
+            (r["seq"], r.get("result_fingerprint")) for r in sorted(requests, key=lambda r: r["seq"])
+        ]) if plan.query_profile != "point" else None,
         "llm_calls": 0, "simulated": False,
     }
     write_json(folder / "summary.json", {**stream, "mode": "zero_llm_calibration", "calibration": record})
