@@ -67,6 +67,7 @@ def _run_sysbench(
         f"--threads={workload.threads}",
         f"--report-interval={workload.report_interval}",
         f"--rand-seed={workload.rand_seed}",
+        f"--rand-type={shlex.quote(workload.rand_type)}",
     ]
     if workload.tables:
         common.append(f"--tables={workload.tables}")
