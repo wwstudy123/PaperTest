@@ -7,7 +7,7 @@ sys.path.insert(0,str(ROOT))
 from admtune.static_diagnostic import plan,counter_delta,summarize,CONCURRENCY_NAMES,joint_utility
 root=ROOT
 parser=argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--run-id',choices=['concurrency-probe-001','uncertainty-repeat-001'],default='concurrency-probe-001')
+parser.add_argument('--run-id',choices=['concurrency-probe-001','uncertainty-repeat-001','gp-noise-validation-001'],default='concurrency-probe-001')
 parser.add_argument('--archive',type=Path)
 parser.add_argument('--output',type=Path)
 args=parser.parse_args()

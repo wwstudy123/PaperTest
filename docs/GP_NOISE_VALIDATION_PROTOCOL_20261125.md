@@ -2,6 +2,8 @@
 
 本协议在新一轮测量之前冻结；不得利用已知旧留出点反复选择策略。计划编号 `gp-noise-validation-001`，本次文档提交时尚未执行。
 
+后续执行结果见[独立验收结果](GP_NOISE_VALIDATION_RESULTS_20261125.md)，以下配置、预算和顺序检验规则未因结果调整。
+
 ## 固定条件
 
 - 复用三个固定配置：Default（1 GiB/并发0）、BufferOnly（4 GiB/并发0）、Concurrency8（4 GiB/并发8）；其余参数均为io_capacity=200、max=2000、排序缓冲256 KiB。

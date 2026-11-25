@@ -1,0 +1,1036 @@
+[
+  {
+    "next_seq": 7,
+    "config": {
+      "innodb_buffer_pool_size": 4294967296,
+      "innodb_io_capacity": 200,
+      "innodb_io_capacity_max": 2000,
+      "innodb_thread_concurrency": 8,
+      "sort_buffer_size": 262144
+    },
+    "submitted_at_utc": "2026-11-25T13:39:17.489033+00:00",
+    "environment_key": "f5b6d29933b02383b93f477222ca068d9c8f6e83c429a5403cc6ad630470b0f0",
+    "submitted_elapsed_seconds": 486.45568323135376,
+    "policy": {
+      "version": "prequential_gp_noise_audit_v1",
+      "legacy": "optimize_on_versions_0_10_20",
+      "candidate": {
+        "version": "repeat_aware_gp_v1",
+        "bootstrap": 6,
+        "min_repeat_degrees_of_freedom": 3,
+        "objective_key": "tps_per_p95:maximize",
+        "optimize_on_each_history_update": true,
+        "grouping": [
+          "environment_key",
+          "objective_key",
+          "phase_id",
+          "config",
+          "context"
+        ],
+        "noise_parameterization": "residual_plus_fixed_variance_v1",
+        "no_automatic_repeat_measurements": true
+      },
+      "label_precision_decimals": 6,
+      "test_sequences": [
+        7,
+        8,
+        9
+      ],
+      "past_test_observation_may_train_next_prediction": true,
+      "no_configuration_search_or_llm": true
+    },
+    "training_sequences": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "models": {
+      "legacy": {
+        "prediction": {
+          "mean": 4.115519225724059,
+          "latent_std": 0.007529824499046966,
+          "observation_std": 0.013043665216691753,
+          "model_version": 1
+        },
+        "snapshot": {
+          "version": 1,
+          "kernel": "joint",
+          "config_dimensions": 6,
+          "input_dimensions": 7,
+          "training_ids": [
+            "repeat-1",
+            "repeat-2",
+            "repeat-3",
+            "repeat-4",
+            "repeat-5",
+            "repeat-6"
+          ],
+          "x": [
+            [
+              0.33333333333333276,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.22580645161290322,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.22580645161290322,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.33333333333333276,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "target": [
+            4.8938514840476435,
+            4.017963806687711,
+            4.104163036197714,
+            4.019091978840552,
+            4.126706503194127,
+            4.8807691533648025
+          ],
+          "target_mean": 4.340424327055426,
+          "target_scale": 0.3887981739529013,
+          "log_hyperparameters": [
+            -2.728978767732237,
+            -0.00039951804520900767,
+            -3.5974279933005264
+          ],
+          "hyperparameters": {
+            "length_scale": 0.06528592773189619,
+            "amplitude": 0.9996005617514981,
+            "noise_std": 0.027394089698210722
+          },
+          "jitter": 1e-09,
+          "seed": 42,
+          "optimizer": {
+            "optimized": true,
+            "success": true,
+            "negative_log_marginal_likelihood": -1.239507291725734,
+            "iterations": 25
+          }
+        }
+      },
+      "repeat_aware": {
+        "prediction": {
+          "mean": 4.115519314549076,
+          "latent_std": 0.0075339625370038025,
+          "observation_std": 0.01305083512728693,
+          "model_version": 1
+        },
+        "snapshot": {
+          "policy": {
+            "version": "repeat_aware_gp_v1",
+            "bootstrap": 6,
+            "min_repeat_degrees_of_freedom": 3,
+            "objective_key": "tps_per_p95:maximize",
+            "optimize_on_each_history_update": true,
+            "grouping": [
+              "environment_key",
+              "objective_key",
+              "phase_id",
+              "config",
+              "context"
+            ],
+            "noise_parameterization": "residual_plus_fixed_variance_v1",
+            "no_automatic_repeat_measurements": true
+          },
+          "space_key": "246f983002063870c2b2cdce9dd464f817f5fa7614cbe4818e92a65788965991",
+          "seed": 42,
+          "training_ids": [
+            "repeat-1",
+            "repeat-2",
+            "repeat-3",
+            "repeat-4",
+            "repeat-5",
+            "repeat-6"
+          ],
+          "record_fingerprints": [
+            "2bd80b14eddbe4f543283cc5ed7877c6701dd39aaef39a5e9bb0ac65fba8739e",
+            "36251ec27a5b8a639a8a5462ec52d8f18d554510b0b741c09f36b6071d94a1a6",
+            "773cf2857bd9650223b00724d2642d4029bb53775ee5c94015264795426d0ad0",
+            "d5843586470a8c06193af6732e2e95000711d0161c987f425a1dfb6632932af6",
+            "04c2610016dc7840c80a5517fde98d0e6417f7024a4b3fc27264b7af9dcec151",
+            "2d881364a4e29562935aa6373c8cc9c74f563c3eb59bd846f329ecaef253256c"
+          ],
+          "audit": {
+            "training_ids": [
+              "repeat-1",
+              "repeat-2",
+              "repeat-3",
+              "repeat-4",
+              "repeat-5",
+              "repeat-6"
+            ],
+            "repeat_groups": 3,
+            "degrees_of_freedom": 3,
+            "sse": 0.00034031402636000113,
+            "estimated_log_std": 0.01065072808716226,
+            "fixed_noise_log_std": 0.01065072808716226,
+            "floor_eligible": true
+          },
+          "gp": {
+            "version": 1,
+            "kernel": "joint",
+            "config_dimensions": 6,
+            "input_dimensions": 7,
+            "training_ids": [
+              "repeat-1",
+              "repeat-2",
+              "repeat-3",
+              "repeat-4",
+              "repeat-5",
+              "repeat-6"
+            ],
+            "x": [
+              [
+                0.33333333333333276,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.22580645161290322,
+                0.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.22580645161290322,
+                0.0,
+                0.0,
+                0.0
+              ],
+              [
+                0.33333333333333276,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "target": [
+              4.8938514840476435,
+              4.017963806687711,
+              4.104163036197714,
+              4.019091978840552,
+              4.126706503194127,
+              4.8807691533648025
+            ],
+            "target_mean": 4.340424327055426,
+            "target_scale": 0.3887981739529013,
+            "log_hyperparameters": [
+              -3.0008541234760338,
+              -0.0003757050778364663,
+              -7.0
+            ],
+            "hyperparameters": {
+              "length_scale": 0.04974456221930185,
+              "amplitude": 0.9996243654904785,
+              "noise_std": 0.0009118819655545162
+            },
+            "jitter": 1e-09,
+            "seed": 42,
+            "optimizer": {
+              "optimized": true,
+              "success": true,
+              "negative_log_marginal_likelihood": -1.239506399685765,
+              "iterations": 23
+            },
+            "noise_policy": {
+              "parameterization": "residual_plus_fixed_variance_v1",
+              "fixed_noise_log_std": 0.01065072808716226,
+              "effective_noise_log_std": 0.010656627328130119
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "next_seq": 8,
+    "config": {
+      "innodb_buffer_pool_size": 1073741824,
+      "innodb_io_capacity": 200,
+      "innodb_io_capacity_max": 2000,
+      "innodb_thread_concurrency": 0,
+      "sort_buffer_size": 262144
+    },
+    "submitted_at_utc": "2026-11-25T13:40:39.734812+00:00",
+    "environment_key": "f5b6d29933b02383b93f477222ca068d9c8f6e83c429a5403cc6ad630470b0f0",
+    "submitted_elapsed_seconds": 568.7628466710448,
+    "policy": {
+      "version": "prequential_gp_noise_audit_v1",
+      "legacy": "optimize_on_versions_0_10_20",
+      "candidate": {
+        "version": "repeat_aware_gp_v1",
+        "bootstrap": 6,
+        "min_repeat_degrees_of_freedom": 3,
+        "objective_key": "tps_per_p95:maximize",
+        "optimize_on_each_history_update": true,
+        "grouping": [
+          "environment_key",
+          "objective_key",
+          "phase_id",
+          "config",
+          "context"
+        ],
+        "noise_parameterization": "residual_plus_fixed_variance_v1",
+        "no_automatic_repeat_measurements": true
+      },
+      "label_precision_decimals": 6,
+      "test_sequences": [
+        7,
+        8,
+        9
+      ],
+      "past_test_observation_may_train_next_prediction": true,
+      "no_configuration_search_or_llm": true
+    },
+    "training_sequences": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "models": {
+      "legacy": {
+        "prediction": {
+          "mean": 4.88709290311957,
+          "latent_std": 0.007137733146532319,
+          "observation_std": 0.012364458372334592,
+          "model_version": 2
+        },
+        "snapshot": {
+          "version": 2,
+          "kernel": "joint",
+          "config_dimensions": 6,
+          "input_dimensions": 7,
+          "training_ids": [
+            "repeat-1",
+            "repeat-2",
+            "repeat-3",
+            "repeat-4",
+            "repeat-5",
+            "repeat-6",
+            "repeat-7"
+          ],
+          "x": [
+            [
+              0.33333333333333276,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.22580645161290322,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.22580645161290322,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.33333333333333276,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.22580645161290322,
+              0.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "target": [
+            4.8938514840476435,
+            4.017963806687711,
+            4.104163036197714,
+            4.019091978840552,
+            4.126706503194127,
+            4.8807691533648025,
+            4.114283912197453
+          ],
+          "target_mean": 4.308118553504287,
+          "target_scale": 0.3685527616063436,
+          "log_hyperparameters": [
+            -2.728978767732237,
+            -0.00039951804520900767,
+            -3.5974279933005264
+          ],
+          "hyperparameters": {
+            "length_scale": 0.06528592773189619,
+            "amplitude": 0.9996005617514981,
+            "noise_std": 0.027394089698210722
+          },
+          "jitter": 1e-09,
+          "seed": 42,
+          "optimizer": {
+            "optimized": false,
+            "reused_hyperparameters": true
+          }
+        }
+      },
+      "repeat_aware": {
+        "prediction": {
+          "mean": 4.887147799879117,
+          "latent_std": 0.0065340787165591345,
+          "observation_std": 0.01131840909940762,
+          "model_version": 2
+        },
+        "snapshot": {
+          "policy": {
+            "version": "repeat_aware_gp_v1",
+            "bootstrap": 6,
+            "min_repeat_degrees_of_freedom": 3,
+            "objective_key": "tps_per_p95:maximize",
+            "optimize_on_each_history_update": true,
+            "grouping": [
+              "environment_key",
+              "objective_key",
+              "phase_id",
+              "config",
+              "context"
+            ],
+            "noise_parameterization": "residual_plus_fixed_variance_v1",
+            "no_automatic_repeat_measurements": true
+          },
+          "space_key": "246f983002063870c2b2cdce9dd464f817f5fa7614cbe4818e92a65788965991",
+          "seed": 42,
+          "training_ids": [
+            "repeat-1",
+            "repeat-2",
+            "repeat-3",
+            "repeat-4",
+            "repeat-5",
+            "repeat-6",
+            "repeat-7"
+          ],
+          "record_fingerprints": [
+            "2bd80b14eddbe4f543283cc5ed7877c6701dd39aaef39a5e9bb0ac65fba8739e",
+            "36251ec27a5b8a639a8a5462ec52d8f18d554510b0b741c09f36b6071d94a1a6",
+            "773cf2857bd9650223b00724d2642d4029bb53775ee5c94015264795426d0ad0",
+            "d5843586470a8c06193af6732e2e95000711d0161c987f425a1dfb6632932af6",
+            "04c2610016dc7840c80a5517fde98d0e6417f7024a4b3fc27264b7af9dcec151",
+            "2d881364a4e29562935aa6373c8cc9c74f563c3eb59bd846f329ecaef253256c",
+            "3bf95694f4f818bc954370f43e082a75991cf98a04e5a0f9d5d21d564ae7e1d1"
+          ],
+          "audit": {
+            "training_ids": [
+              "repeat-1",
+              "repeat-2",
+              "repeat-3",
+              "repeat-4",
+              "repeat-5",
+              "repeat-6",
+              "repeat-7"
+            ],
+            "repeat_groups": 3,
+            "degrees_of_freedom": 4,
+            "sse": 0.0003411970083478535,
+            "estimated_log_std": 0.00923575942123675,
+            "fixed_noise_log_std": 0.00923575942123675,
+            "floor_eligible": true
+          },
+          "gp": {
+            "version": 2,
+            "kernel": "joint",
+            "config_dimensions": 6,
+            "input_dimensions": 7,
+            "training_ids": [
+              "repeat-1",
+              "repeat-2",
+              "repeat-3",
+              "repeat-4",
+              "repeat-5",
+              "repeat-6",
+              "repeat-7"
+            ],
+            "x": [
+              [
+                0.33333333333333276,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.22580645161290322,
+                0.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.22580645161290322,
+                0.0,
+                0.0,
+                0.0
+              ],
+              [
+                0.33333333333333276,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.22580645161290322,
+                0.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "target": [
+              4.8938514840476435,
+              4.017963806687711,
+              4.104163036197714,
+              4.019091978840552,
+              4.126706503194127,
+              4.8807691533648025,
+              4.114283912197453
+            ],
+            "target_mean": 4.308118553504287,
+            "target_scale": 0.3685527616063436,
+            "log_hyperparameters": [
+              -3.0008541234760338,
+              0.056745003683103375,
+              -6.999998724495737
+            ],
+            "hyperparameters": {
+              "length_scale": 0.04974456221930185,
+              "amplitude": 1.0583858914786153,
+              "noise_std": 0.0009118831286645925
+            },
+            "jitter": 1e-09,
+            "seed": 42,
+            "optimizer": {
+              "optimized": true,
+              "success": true,
+              "negative_log_marginal_likelihood": -3.4003373371394865,
+              "iterations": 3
+            },
+            "noise_policy": {
+              "parameterization": "residual_plus_fixed_variance_v1",
+              "fixed_noise_log_std": 0.00923575942123675,
+              "effective_noise_log_std": 0.009241872097543992
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "next_seq": 9,
+    "config": {
+      "innodb_buffer_pool_size": 4294967296,
+      "innodb_io_capacity": 200,
+      "innodb_io_capacity_max": 2000,
+      "innodb_thread_concurrency": 0,
+      "sort_buffer_size": 262144
+    },
+    "submitted_at_utc": "2026-11-25T13:41:58.431144+00:00",
+    "environment_key": "f5b6d29933b02383b93f477222ca068d9c8f6e83c429a5403cc6ad630470b0f0",
+    "submitted_elapsed_seconds": 647.4558680579066,
+    "policy": {
+      "version": "prequential_gp_noise_audit_v1",
+      "legacy": "optimize_on_versions_0_10_20",
+      "candidate": {
+        "version": "repeat_aware_gp_v1",
+        "bootstrap": 6,
+        "min_repeat_degrees_of_freedom": 3,
+        "objective_key": "tps_per_p95:maximize",
+        "optimize_on_each_history_update": true,
+        "grouping": [
+          "environment_key",
+          "objective_key",
+          "phase_id",
+          "config",
+          "context"
+        ],
+        "noise_parameterization": "residual_plus_fixed_variance_v1",
+        "no_automatic_repeat_measurements": true
+      },
+      "label_precision_decimals": 6,
+      "test_sequences": [
+        7,
+        8,
+        9
+      ],
+      "past_test_observation_may_train_next_prediction": true,
+      "no_configuration_search_or_llm": true
+    },
+    "training_sequences": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "models": {
+      "legacy": {
+        "prediction": {
+          "mean": 4.018663354884931,
+          "latent_std": 0.007610398809741995,
+          "observation_std": 0.01318324142247247,
+          "model_version": 3
+        },
+        "snapshot": {
+          "version": 3,
+          "kernel": "joint",
+          "config_dimensions": 6,
+          "input_dimensions": 7,
+          "training_ids": [
+            "repeat-1",
+            "repeat-2",
+            "repeat-3",
+            "repeat-4",
+            "repeat-5",
+            "repeat-6",
+            "repeat-7",
+            "repeat-8"
+          ],
+          "x": [
+            [
+              0.33333333333333276,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.22580645161290322,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.22580645161290322,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.33333333333333276,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              1.0,
+              0.05263157894736842,
+              0.0,
+              0.22580645161290322,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.33333333333333276,
+              0.05263157894736842,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0
+            ]
+          ],
+          "target": [
+            4.8938514840476435,
+            4.017963806687711,
+            4.104163036197714,
+            4.019091978840552,
+            4.126706503194127,
+            4.8807691533648025,
+            4.114283912197453,
+            4.878345187899733
+          ],
+          "target_mean": 4.379396882803717,
+          "target_scale": 0.39295858232227376,
+          "log_hyperparameters": [
+            -2.728978767732237,
+            -0.00039951804520900767,
+            -3.5974279933005264
+          ],
+          "hyperparameters": {
+            "length_scale": 0.06528592773189619,
+            "amplitude": 0.9996005617514981,
+            "noise_std": 0.027394089698210722
+          },
+          "jitter": 1e-09,
+          "seed": 42,
+          "optimizer": {
+            "optimized": false,
+            "reused_hyperparameters": true
+          }
+        }
+      },
+      "repeat_aware": {
+        "prediction": {
+          "mean": 4.018621960336718,
+          "latent_std": 0.0062874406136348435,
+          "observation_std": 0.010891105953970838,
+          "model_version": 3
+        },
+        "snapshot": {
+          "policy": {
+            "version": "repeat_aware_gp_v1",
+            "bootstrap": 6,
+            "min_repeat_degrees_of_freedom": 3,
+            "objective_key": "tps_per_p95:maximize",
+            "optimize_on_each_history_update": true,
+            "grouping": [
+              "environment_key",
+              "objective_key",
+              "phase_id",
+              "config",
+              "context"
+            ],
+            "noise_parameterization": "residual_plus_fixed_variance_v1",
+            "no_automatic_repeat_measurements": true
+          },
+          "space_key": "246f983002063870c2b2cdce9dd464f817f5fa7614cbe4818e92a65788965991",
+          "seed": 42,
+          "training_ids": [
+            "repeat-1",
+            "repeat-2",
+            "repeat-3",
+            "repeat-4",
+            "repeat-5",
+            "repeat-6",
+            "repeat-7",
+            "repeat-8"
+          ],
+          "record_fingerprints": [
+            "2bd80b14eddbe4f543283cc5ed7877c6701dd39aaef39a5e9bb0ac65fba8739e",
+            "36251ec27a5b8a639a8a5462ec52d8f18d554510b0b741c09f36b6071d94a1a6",
+            "773cf2857bd9650223b00724d2642d4029bb53775ee5c94015264795426d0ad0",
+            "d5843586470a8c06193af6732e2e95000711d0161c987f425a1dfb6632932af6",
+            "04c2610016dc7840c80a5517fde98d0e6417f7024a4b3fc27264b7af9dcec151",
+            "2d881364a4e29562935aa6373c8cc9c74f563c3eb59bd846f329ecaef253256c",
+            "3bf95694f4f818bc954370f43e082a75991cf98a04e5a0f9d5d21d564ae7e1d1",
+            "40b9a09b04cde9f04f17ba6e2eabc10da93e7f899ace09cef4a747f36578411c"
+          ],
+          "audit": {
+            "training_ids": [
+              "repeat-1",
+              "repeat-2",
+              "repeat-3",
+              "repeat-4",
+              "repeat-5",
+              "repeat-6",
+              "repeat-7",
+              "repeat-8"
+            ],
+            "repeat_groups": 3,
+            "degrees_of_freedom": 5,
+            "sse": 0.0003947793885995092,
+            "estimated_log_std": 0.008885711998478334,
+            "fixed_noise_log_std": 0.008885711998478334,
+            "floor_eligible": true
+          },
+          "gp": {
+            "version": 3,
+            "kernel": "joint",
+            "config_dimensions": 6,
+            "input_dimensions": 7,
+            "training_ids": [
+              "repeat-1",
+              "repeat-2",
+              "repeat-3",
+              "repeat-4",
+              "repeat-5",
+              "repeat-6",
+              "repeat-7",
+              "repeat-8"
+            ],
+            "x": [
+              [
+                0.33333333333333276,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.22580645161290322,
+                0.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.22580645161290322,
+                0.0,
+                0.0,
+                0.0
+              ],
+              [
+                0.33333333333333276,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ],
+              [
+                1.0,
+                0.05263157894736842,
+                0.0,
+                0.22580645161290322,
+                0.0,
+                0.0,
+                0.0
+              ],
+              [
+                0.33333333333333276,
+                0.05263157894736842,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "target": [
+              4.8938514840476435,
+              4.017963806687711,
+              4.104163036197714,
+              4.019091978840552,
+              4.126706503194127,
+              4.8807691533648025,
+              4.114283912197453,
+              4.878345187899733
+            ],
+            "target_mean": 4.379396882803717,
+            "target_scale": 0.39295858232227376,
+            "log_hyperparameters": [
+              -3.0008541234760338,
+              -0.009021686740123101,
+              -7.0
+            ],
+            "hyperparameters": {
+              "length_scale": 0.04974456221930185,
+              "amplitude": 0.9910188865707865,
+              "noise_std": 0.0009118819655545162
+            },
+            "jitter": 1e-09,
+            "seed": 42,
+            "optimizer": {
+              "optimized": true,
+              "success": true,
+              "negative_log_marginal_likelihood": -6.176367202915991,
+              "iterations": 4
+            },
+            "noise_policy": {
+              "parameterization": "residual_plus_fixed_variance_v1",
+              "fixed_noise_log_std": 0.008885711998478334,
+              "effective_noise_log_std": 0.008892934241893061
+            }
+          }
+        }
+      }
+    }
+  }
+]

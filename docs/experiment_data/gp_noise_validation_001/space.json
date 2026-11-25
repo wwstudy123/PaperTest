@@ -1,0 +1,74 @@
+[
+  {
+    "name": "innodb_buffer_pool_size",
+    "kind": "integer",
+    "default": 1073741824,
+    "lower": 536870912,
+    "upper": 4294967296,
+    "choices": [],
+    "special": [],
+    "step": 134217728,
+    "log_scale": true,
+    "restart_required": false,
+    "unit": "bytes",
+    "description": ""
+  },
+  {
+    "name": "innodb_io_capacity",
+    "kind": "integer",
+    "default": 200,
+    "lower": 100,
+    "upper": 2000,
+    "choices": [],
+    "special": [],
+    "step": 100,
+    "log_scale": false,
+    "restart_required": false,
+    "unit": null,
+    "description": ""
+  },
+  {
+    "name": "innodb_io_capacity_max",
+    "kind": "integer",
+    "default": 2000,
+    "lower": 2000,
+    "upper": 6000,
+    "choices": [],
+    "special": [],
+    "step": 500,
+    "log_scale": false,
+    "restart_required": false,
+    "unit": null,
+    "description": ""
+  },
+  {
+    "name": "innodb_thread_concurrency",
+    "kind": "integer",
+    "default": 0,
+    "lower": 1,
+    "upper": 32,
+    "choices": [],
+    "special": [
+      0
+    ],
+    "step": 1,
+    "log_scale": false,
+    "restart_required": false,
+    "unit": null,
+    "description": "0表示不限制InnoDB内部并发；普通值1到32，不是容器CPU核配额。0仅作为特殊值。"
+  },
+  {
+    "name": "sort_buffer_size",
+    "kind": "integer",
+    "default": 262144,
+    "lower": 262144,
+    "upper": 8388608,
+    "choices": [],
+    "special": [],
+    "step": 262144,
+    "log_scale": true,
+    "restart_required": false,
+    "unit": "bytes",
+    "description": ""
+  }
+]
