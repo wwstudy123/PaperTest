@@ -1,0 +1,43 @@
+{
+  "source": "AgenticDB Figure 5, MS Sysbench Read, page 9",
+  "source_pdf_sha256": "e305e62a06d3af011945e25d8d5bfea9aca4f601b09d5a276957511aaf110696",
+  "extraction": "original PDF vector vertices and axis ticks; no inferred evaluation counts",
+  "specifications": {
+    "throughput": {
+      "indices": {
+        "GPTuner": 42,
+        "AgentTune": 44,
+        "CDBTune": 45,
+        "AgenticDB": 46
+      },
+      "x0": 159.26268390625003,
+      "x100": 214.49356840625,
+      "y0": 249.85327065455,
+      "value0": 5000,
+      "dy": 8.71730742684997,
+      "dvalue": 250,
+      "unit": "TPS"
+    },
+    "latency": {
+      "indices": {
+        "GPTuner": 47,
+        "AgentTune": 49,
+        "CDBTune": 50,
+        "AgenticDB": 51
+      },
+      "x0": 232.43320206250002,
+      "x100": 291.7956475625,
+      "y0": 249.32769226599999,
+      "value0": 15,
+      "dy": 9.92116833404998,
+      "dvalue": 1,
+      "unit": "ms"
+    }
+  },
+  "notes_zh": [
+    "原文基线保留原始横坐标及终止时间；不补造到100分钟的观测。",
+    "原文优化目标为TPS/P95，当前ADMTune为TPS最大化；原文AgenticDB含OS调优，当前ADMTune仅调DB参数。",
+    "原文与本次数据集、调参空间及执行容器并非同一实测协议，曲线用于来源明确的跨实验参照，不能据此宣称同条件优劣。",
+    "PDF折线坐标有路径简化及坐标舍入，不作为原始逐次试验记录。"
+  ]
+}

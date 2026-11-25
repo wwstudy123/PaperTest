@@ -1,0 +1,29 @@
+{
+  "run": "timed-static-100min-001",
+  "status": "connection_lost_completion_unverified",
+  "planned_budget_seconds": 6000,
+  "server": "connect.westb.seetacloud.com:18594",
+  "container": "autodl-container-509c44b497-69630bbc",
+  "remote_run_directory": "/root/PaperTest100/runs/timed-static-100min-001",
+  "source_revision": "148cf54",
+  "last_verified_remote_clock": "2026-11-25 03:50:35 CST",
+  "completed_attempts_at_last_check": 14,
+  "valid_observations_at_last_check": 14,
+  "baseline_tps": 2459.08,
+  "accepted_search_tps_at_last_check": 3789.88,
+  "progress_elapsed_seconds": 1150.2346723489463,
+  "llm_calls_at_last_check": 4,
+  "tokens_at_last_check": 5174,
+  "counts_at_last_check": {
+    "audit": 1,
+    "baseline": 1,
+    "candidate": 2,
+    "incumbent_repeat": 5,
+    "reference": 1,
+    "startup": 4
+  },
+  "completion_verified": false,
+  "final_verification_available_locally": false,
+  "raw_trials_available_locally": false,
+  "note_zh": "以上仅为已读取检查点，不是完整逐试验数据。不能据此补造100分钟曲线；SSH中断不能证明后台进程已停止。"
+}
