@@ -180,9 +180,17 @@ class LLMClient:
         timeout_s: int | None = None,
         conversation_messages: list[dict[str, str]] | None = None,
         max_output_tokens: int | None = None,
+        temperature: float | None = None,
+        top_p: float | None = None,
     ) -> dict[str, Any]:
         self.last_usage = None
         self.last_retry_events = []
+        if temperature is not None and (isinstance(temperature, bool) or not isinstance(temperature, (int, float))
+                                        or not 0 <= temperature <= 2):
+            raise ValueError("temperature must be in [0,2]")
+        if top_p is not None and (isinstance(top_p, bool) or not isinstance(top_p, (int, float))
+                                  or not 0 < top_p <= 1):
+            raise ValueError("top_p must be in (0,1]")
         url = f"{self.base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -205,10 +213,12 @@ class LLMClient:
 
         body = {
             "model": self.model,
-            "temperature": 0.2,
+            "temperature": 0.2 if temperature is None else temperature,
             "response_format": {"type": "json_object"},
             "messages": messages,
         }
+        if top_p is not None:
+            body["top_p"] = top_p
         if max_output_tokens is not None:
             body["max_tokens"] = max_output_tokens
         if self.enable_thinking is not None:

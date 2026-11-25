@@ -1,0 +1,24 @@
+{
+  "AgentTune": {
+    "commit": "9b68872434665ef552b98999b05a785cb5d7aa4c",
+    "files": {
+      "config.ini": "a731dd8a377d89b610bea7e5a1ef4e7be1fef8777e798d6a3b2a35f0d23f965c",
+      "configuration recommender/LLM_server.py": "5b06d6581e56a2e07e35105ece975ad9ca4d60095ea05a9b11c307136e6a2518",
+      "configuration recommender/config_rank.py": "e5b60ed8f5c1c874f965bc0cfa2cab22010216ead3f0328bea1b436fb15189de",
+      "knob selector/knob_select.py": "859963fe5693d495be4b795aed351c844d9d83161ae102b3b13a4b372b5f76a2",
+      "range pruner/range_pruner.py": "bedee6e718d3a10bc21d87c3b5aa8b3d31337cb9efafaa659380b9fae4a0a956"
+    }
+  },
+  "AgenticDB": {
+    "commit": "321cb7ca350bbf382e7a1696ccfff859ac53f315",
+    "files": {
+      "auditor.py": "a59925664a7257e99275800c79f95817bc89081dc9b471f8cfad0a3490850a34",
+      "README.md": "baed406204f8c0f231f8a9b14ba1c5e4143e3c90515ca22bdb8be0bb3a326ab4",
+      "LICENSE": "e7b9aeb19b729930f9ff45c924d226feb03bd9947eb2901e5e6d833dbd635543"
+    }
+  },
+  "papers": {
+    "AgenticDB.pdf": "e305e62a06d3af011945e25d8d5bfea9aca4f601b09d5a276957511aaf110696",
+    "AgentTune.pdf": "7284fc071bbdf5e7f8bcf8e24af29d7a0e73fb678ddd631f62456a9845a7cb3c"
+  }
+}
