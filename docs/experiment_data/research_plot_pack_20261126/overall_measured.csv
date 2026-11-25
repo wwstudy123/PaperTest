@@ -1,0 +1,5 @@
+run,version,optimization_objective,baseline_tps,baseline_p95_ms,final_tps,final_p95_ms,valid_measurements,llm_calls,actual_tokens,interrupted_slots,recovered,accepted_configuration_changed
+timed-static-100min-002,ADMTune TPS prototype,TPS maximize,2449.19,18.28,3807.49,68.05,71,13,23187,0,False,True
+composite-pilot-002,Joint pilot,TPS/P95 maximize,2449.99,18.28,2396.99,18.61,7,5,10641,0,False,False
+composite-pair-legacy-001,Legacy GP,TPS/P95 maximize,2439.74,18.28,2381.4,18.61,7,4,8877,0,False,False
+composite-pair-repeat-001,Repeat GP (recovered),TPS/P95 maximize,2432.76,18.28,2487.79,17.63,7,4,9116,1,True,False

@@ -1,0 +1,32 @@
+[
+  {
+    "call": 2,
+    "role": "pruner",
+    "ranges": {
+      "innodb_buffer_pool_size": {
+        "lower": 1073741824,
+        "upper": 2147483648,
+        "choices": [],
+        "special": []
+      },
+      "innodb_io_capacity": {
+        "lower": 200,
+        "upper": 800,
+        "choices": [],
+        "special": []
+      },
+      "innodb_io_capacity_max": {
+        "lower": 2000,
+        "upper": 4000,
+        "choices": [],
+        "special": []
+      },
+      "sort_buffer_size": {
+        "lower": 262144,
+        "upper": 2097152,
+        "choices": [],
+        "special": []
+      }
+    }
+  }
+]

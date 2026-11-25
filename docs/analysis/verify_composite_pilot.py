@@ -16,6 +16,10 @@ sys.path.insert(0, str(ROOT))
 from admtune.contracts import fingerprint
 from admtune.space import Knob, Space
 from admtune.surrogate import GaussianProcess
+from admtune.contracts import Trial
+from admtune.composite_static import pilot_limits, runtime_policy
+from admtune.repeat_aware_gp import repeat_noise, record_fingerprint
+from dataclasses import asdict as dataclass_dict
 
 
 def load(path):
@@ -40,8 +44,8 @@ def main():
     parser.add_argument("--archive", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if not re.fullmatch(r"composite-pilot-\d{3}", args.run_id):
-        parser.error("run-id必须采用composite-pilot-NNN格式")
+    if not re.fullmatch(r"composite-(pilot-\d{3}|pair-(legacy|repeat)-\d{3})", args.run_id):
+        parser.error("run-id必须为composite-pilot-NNN或composite-pair-legacy/repeat-NNN")
     args.archive = args.archive or ROOT / f"runs/archives/{args.run_id}.tar.gz"
     args.output = args.output or ROOT / f"runs/collected-{args.run_id}"
     inventory = load(args.archive.with_suffix(".inventory.json"))
@@ -71,9 +75,12 @@ def main():
     assert manifest["objective"] == "tps_per_p95:maximize"
     assert manifest["imported_historical_observations"] == 0
     assert manifest["policy"]["label_precision_decimals"] == 6
-    assert manifest["limits"] == {
-        "trials": 8, "wall_seconds": 1200, "llm_calls": 8,
-        "llm_tokens": 32000, "recovery_reserve_seconds": 60}
+    calibration = manifest["policy"].get("initial_noise_repeats", 0)
+    gp_policy = manifest["policy"].get("gp_policy", "legacy")
+    limits = manifest["limits"]
+    assert limits == dataclass_dict(pilot_limits(calibration))
+    if calibration or gp_policy != "legacy":
+        assert manifest["policy"] == runtime_policy(gp_policy, calibration)
     assert (manifest["benchmark"]["workload"]["duration"],
             manifest["benchmark"]["workload"]["warmup_time"],
             manifest["benchmark"]["workload"]["threads"],
@@ -81,7 +88,7 @@ def main():
     for name, digest in load(p / "checksums.json").items():
         assert hashlib.sha256((p / name).read_bytes()).hexdigest() == digest
     records, attempts = lines(p / "trials.jsonl"), lines(audit / "attempts.jsonl")
-    assert 1 <= len(records) == len(attempts) <= 8
+    assert 1 <= len(records) == len(attempts) <= limits["trials"]
     assert [r["metadata"]["seq"] for r in records] == list(range(1, len(records) + 1))
     assert len({r["trial_id"] for r in records}) == len(records)
     for attempt, record in zip(attempts, records):
@@ -89,6 +96,10 @@ def main():
         assert attempt["submitted"]["config"] == record["config"]
         assert attempt["submitted"]["prediction"] == record["prediction"]
     byid = {r["trial_id"]: r for r in records}
+    if calibration:
+        for r in records[1:calibration+1]:
+            assert r["metadata"]["kind"] == "noise_calibration"
+            assert r["config"] == records[0]["config"] and not r["metadata"]["accepted"]
     space = Space([Knob(**spec) for spec in manifest["space"]])
     snapshots = {}
     for path in sorted((p / "gp_snapshots").glob("*.json")):
@@ -101,6 +112,11 @@ def main():
             expected = space.encode(r["config"]) + r["context"]
             assert len(x) == len(expected) and all(abs(a-b) < 1e-12 for a, b in zip(x, expected))
             assert math.isclose(y, math.log(r["value"]), abs_tol=1e-12)
+        if gp_policy == "repeat-aware":
+            audit_noise = repeat_noise([Trial(**byid[i]) for i in saved["training_ids"]])
+            fixed = (saved.get("noise_policy") or {}).get("fixed_noise_log_std", 0)
+            assert math.isclose(fixed, audit_noise["fixed_noise_log_std"], rel_tol=1e-9, abs_tol=1e-12)
+            assert saved["optimizer"]["optimized"]
         snapshots[str(path.relative_to(p))] = (saved, GaussianProcess.from_snapshot(saved))
     rows, forecasts, accepted = [], [], []
     best = None
@@ -109,7 +125,7 @@ def main():
         meta, seq = r["metadata"], r["metadata"]["seq"]
         assert r["objective_key"] == manifest["objective"] and r["environment_key"] == records[0]["environment_key"]
         assert meta["simulated"] is False and meta["kind"] != "incumbent_repeat"
-        assert previous_elapsed < meta["active_elapsed_seconds"] <= 1200
+        assert previous_elapsed < meta["active_elapsed_seconds"] <= limits["wall_seconds"]
         previous_elapsed = meta["active_elapsed_seconds"]
         valid = (r["status"] == "measured" and r["complete"] and r["effective"]
                  and r["constraints_ok"] and r["value"] is not None)
@@ -166,11 +182,12 @@ def main():
     curve = list(csv.DictReader((p / "curve.csv").open()))
     assert len(curve) == len(records)
     for row, r in zip(curve, records):
-        assert float(row["tps"]) == r["metadata"]["raw_tps"]
-        assert float(row["p95_ms"]) == r["metadata"]["p95_latency_ms"]
-        assert float(row["objective_value"]) == r["value"]
+        for field, expected in (("tps", r["metadata"].get("raw_tps")),
+                                ("p95_ms", r["metadata"].get("p95_latency_ms")),
+                                ("objective_value", r["value"])):
+            assert (row[field] == "" if expected is None else float(row[field]) == expected)
     events, refs = lines(p / "events.jsonl"), load(p / "reflections.json")
-    decisions = []
+    decisions, prescreen_predictions = [], []
     models_by_version = {s["version"]: s for s, _ in snapshots.values()}
     decision_inputs = [
         (r["metadata"]["seq"], "selected", r["metadata"]["decision"], r["config"])
@@ -195,6 +212,14 @@ def main():
         for pred in preds:
             saved = models_by_version[pred["model_version"]]
             assert all(byid[ident]["metadata"]["seq"] < seq for ident in saved["training_ids"])
+        for ident, pred in zip(decision["config_ids"], preds):
+            low, high = pred["mean"]-2*pred["latent_std"], pred["mean"]+2*pred["latent_std"]
+            prescreen_predictions.append({
+                "next_trial": seq, "decision_outcome": outcome, "config_id": ident,
+                "model_version": pred["model_version"], "predicted_objective": math.exp(pred["mean"]),
+                "lower_latent": math.exp(low), "upper_latent": math.exp(high),
+                "lcb_pass": low >= floor, "ucb_pass": high > gain,
+                "prediction_is_not_actual_performance": True})
         if outcome == "refused":
             assert not eligible
         else:
@@ -202,6 +227,8 @@ def main():
             assert decision["config_ids"][chosen] == fingerprint(config)
         decisions.append({"next_trial": seq, "outcome": outcome, "pool_size": len(preds),
                           "eligible": len(eligible), "training_n": len(saved["training_ids"]),
+                          "lcb_pass": sum(p["mean"]-2*p["latent_std"] >= floor for p in preds),
+                          "ucb_pass": sum(p["mean"]+2*p["latent_std"] > gain for p in preds),
                           "floor_objective": math.exp(floor), "required_gain_objective": math.exp(gain)})
     covered = set()
     for ref in refs:
@@ -216,14 +243,20 @@ def main():
     ledger, state = runtime["ledger"], runtime["state"]
     usage = load(p / "llm_usage.json")
     known_tokens = sum((t.get("usage") or {}).get("total_tokens", 0) for t in traces)
-    assert len(traces) == ledger["llm_calls"] <= 8
-    assert known_tokens == usage["total_tokens"] <= ledger["llm_tokens_or_reserved"] <= 32000
-    assert ledger["trial_slots_used"] == len(records) and summary["budget"]["elapsed_seconds"] <= 1200
+    assert len(traces) == ledger["llm_calls"] <= limits["llm_calls"]
+    assert known_tokens == usage["total_tokens"] <= ledger["llm_tokens_or_reserved"] <= limits["llm_tokens"]
+    assert ledger["trial_slots_used"] == len(records) and summary["budget"]["elapsed_seconds"] <= limits["wall_seconds"]
+    if gp_policy == "repeat-aware" and state.get("repeat_gp"):
+        wrapper = state["repeat_gp"]
+        assert wrapper["gp"] == state["gp"]
+        assert wrapper["space_key"] == manifest["preflight"]["space_key"]
+        assert wrapper["record_fingerprints"] == [
+            record_fingerprint(Trial(**byid[i])) for i in wrapper["training_ids"]]
     refresh = sum(e["kind"] == "candidate_refresh" for e in events)
     rejections = sum(e["kind"] == "prescreen_refused" for e in events)
     assert refresh == state["refresh_count"] <= 2
     if summary.get("closed_loop_verified"):
-        assert summary["status"] == "completed" and summary["final_reflection_committed"]
+        assert summary["status"] in {"completed", "completed_with_recovery"} and summary["final_reflection_committed"]
         assert set(byid) == covered and snapshots and forecasts
         assert rejections or any(r["metadata"]["kind"] == "candidate" for r in records)
         assert {t["role"] for t in traces} == {"selector", "pruner", "recommender", "reflection"}
@@ -264,16 +297,24 @@ def main():
         "gp_hyperparameters": (state.get("gp") or {}).get("hyperparameters"),
         "gp_kernel": (state.get("gp") or {}).get("kernel"),
         "gp_final_optimizer": (state.get("gp") or {}).get("optimizer"),
+        "gp_policy": gp_policy, "initial_noise_repeats": calibration,
+        "repeat_noise_audit": summary.get("repeat_noise_audit"), "limits": limits,
+        "recovery": summary.get("recovery"),
+        "invalid_attempts": sum(not r["valid"] for r in rows),
     }
     public = ROOT / "docs/experiment_data" / args.run_id.replace("-", "_")
     public.mkdir(parents=True, exist_ok=True)
     write_csv(public / "observations.csv", rows)
     write_csv(public / "predictions.csv", forecasts)
     write_csv(public / "decisions.csv", decisions)
+    write_csv(public / "candidate_prescreen_predictions.csv", prescreen_predictions)
     write_csv(public / "gp_fits.csv", [{
         "version": s["version"], "training_n": len(s["training_ids"]), "kernel": s["kernel"],
         **s["hyperparameters"], "target_log_scale": s["target_scale"],
         "noise_log_units": s["hyperparameters"]["noise_std"]*s["target_scale"],
+        "fixed_noise_log_std": (s.get("noise_policy") or {}).get("fixed_noise_log_std", 0),
+        "effective_noise_log_std": math.hypot(s["hyperparameters"]["noise_std"]*s["target_scale"],
+            (s.get("noise_policy") or {}).get("fixed_noise_log_std", 0)),
         "optimized": s["optimizer"]["optimized"],
         "optimizer_success": s["optimizer"].get("success"),
         "negative_log_marginal_likelihood": s["optimizer"].get("negative_log_marginal_likelihood")}

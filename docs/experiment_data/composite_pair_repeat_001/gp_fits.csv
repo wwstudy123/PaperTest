@@ -1,0 +1,2 @@
+version,training_n,kernel,length_scale,amplitude,noise_std,target_log_scale,noise_log_units,fixed_noise_log_std,effective_noise_log_std,optimized,optimizer_success,negative_log_marginal_likelihood
+1,6,joint,0.257071109276545,1.5189508415808954,0.0009118820191107164,0.35946272530828566,0.00032778759574916036,0.006430562729620743,0.006438911532822484,True,True,-2.4227888503713713

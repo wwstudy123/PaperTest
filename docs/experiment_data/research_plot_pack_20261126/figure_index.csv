@@ -1,0 +1,11 @@
+id,title,figure,dataset,scope
+01,真实静态调优轨迹,admtune_100min_measured,timed_static_100min_002,TPS旧原型，71次真实观测；非新综合目标
+02,六方法文献参照,six_method_reference_20261126,timed_static_100min_002,四条文献曲线；不同协议，非同条件排名
+03,吞吐与尾延迟诊断,static_diagnostic_001,static_diagnostic_001,9次固定配置测量，非算法搜索
+04,固定请求强度复验,rate_diagnostic_001,rate_diagnostic_001,1000TPS限速；不可拼接不限速TPS
+05,综合目标闭环,composite_pilot_002,composite_pilot_002,真实LLM，未发现优于初始配置的分数
+06,重复与区间失配,uncertainty_repeat_001,uncertainty_repeat_001,原固定6/3留出负结果保留
+07,新GP顺序预测验收,gp_noise_validation_001,gp_noise_validation_001,真实测量前封存，只有3个检验点
+08,GP闭环先导记录,composite_gp_pair_001,composite_gp_pair_001,新GP臂恢复后补最终复测，非不中断对照
+09,LLM实测开销,llm_overhead_20261126,research_plot_pack_20261126,真实调用和tokens；不猜测费用
+10,负载区分度校准,discrimination_001,discrimination_001,热点/均匀分布校准，非动态方法优势

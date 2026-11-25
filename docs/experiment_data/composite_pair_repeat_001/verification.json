@@ -1,0 +1,110 @@
+{
+  "verified": true,
+  "run_id": "composite-pair-repeat-001",
+  "closed_loop_verified": true,
+  "status": "completed_with_recovery",
+  "error": null,
+  "objective": "tps_per_p95:maximize",
+  "archive_sha256": "9253dc2156be301eb77f1d0a16c09110f5c79e9ef915688983db5e17ebe5ee83",
+  "git_revision": "9cd9e4600a66bdf1890962e724615e95c31d8228",
+  "trials": 8,
+  "valid": 7,
+  "unique_configs": 3,
+  "counts_by_kind": {
+    "audit": 1,
+    "baseline": 1,
+    "noise_calibration": 3,
+    "startup": 1,
+    "verification": 2
+  },
+  "accepted_at": [],
+  "baseline_tps": 2432.76,
+  "baseline_p95_ms": 18.28,
+  "baseline_objective": 133.083151,
+  "last_tps": 2487.79,
+  "last_p95_ms": 17.63,
+  "last_objective": 141.111174,
+  "last_kind": "verification",
+  "independent_verification_available": true,
+  "last_objective_vs_baseline_pct": 6.032336129462412,
+  "search_value": 133.083151,
+  "incumbent": {
+    "innodb_buffer_pool_size": 1073741824,
+    "innodb_io_capacity": 200,
+    "innodb_io_capacity_max": 2000,
+    "innodb_thread_concurrency": 0,
+    "sort_buffer_size": 262144
+  },
+  "llm_calls": 4,
+  "known_tokens": 9116,
+  "charged_tokens_or_reserved": 9116,
+  "roles": [
+    "selector",
+    "pruner",
+    "recommender",
+    "reflection"
+  ],
+  "model": "qwen3.7-plus",
+  "gp_training_count": 6,
+  "prospective_predictions": 1,
+  "gp_rejections": 1,
+  "refresh_count": 1,
+  "reflection_count": 1,
+  "reflected_records": 8,
+  "reflection_error": null,
+  "stop_reason": "Original search stopped for reflection reserve; interrupted verification recovered",
+  "active_seconds": 686.491288036108,
+  "initial_restored": true,
+  "prediction_mape_pct": 5.853794079180186,
+  "prediction_coverage": 0,
+  "gp_hyperparameters": {
+    "length_scale": 0.257071109276545,
+    "amplitude": 1.5189508415808954,
+    "noise_std": 0.0009118820191107164
+  },
+  "gp_kernel": "joint",
+  "gp_final_optimizer": {
+    "optimized": true,
+    "success": true,
+    "negative_log_marginal_likelihood": -2.4227888503713713,
+    "iterations": 28
+  },
+  "gp_policy": "repeat-aware",
+  "initial_noise_repeats": 3,
+  "repeat_noise_audit": {
+    "training_ids": [
+      "a060f6ca924b44fe9790ac615f029671",
+      "b5ffade097714adb99493ec931d70d7a",
+      "0b660fa2bd5d4f3191c7dd6debe8e6f4",
+      "e32f36953fd1491b8ec29846647ff213",
+      "0dd8d389e4ec4743bcb85159b123b3c9",
+      "cbb7ec3c177a4dfd9214e98d43fb53fe"
+    ],
+    "repeat_groups": 1,
+    "degrees_of_freedom": 3,
+    "sse": 0.00012405641105876216,
+    "estimated_log_std": 0.006430562729620743,
+    "fixed_noise_log_std": 0.006430562729620743,
+    "floor_eligible": true
+  },
+  "limits": {
+    "trials": 10,
+    "wall_seconds": 1500,
+    "llm_calls": 6,
+    "llm_tokens": 24000,
+    "recovery_reserve_seconds": 60
+  },
+  "recovery": {
+    "resumed_at_utc": "2026-11-25T16:28:23.994542+00:00",
+    "interrupted_slot": 7,
+    "known_prior_active_seconds": 490.92111290991306,
+    "estimated_interruption_seconds_charged": 105,
+    "estimated_charge_is_not_measured_wall_time": true,
+    "strict_uninterrupted_pair": false,
+    "search_resumed": false,
+    "recovered_final_used_for_training": false,
+    "pre_interruption_archive_sha256": "3fed81e90a8b0191144374afd13eb9e3f08eb215e6fc63eec81964e222e56efd",
+    "helper_sha256": "9c49305c057e314c52cc83e10113bf6fedaf6255096faedb91507616ad772dde"
+  },
+  "invalid_attempts": 1
+}

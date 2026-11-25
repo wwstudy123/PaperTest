@@ -1,0 +1,2 @@
+next_trial,outcome,pool_size,eligible,training_n,lcb_pass,ucb_pass,floor_objective,required_gain_objective
+7,refused,6,0,6,0,5,120.11849010000003,134.79963889000007

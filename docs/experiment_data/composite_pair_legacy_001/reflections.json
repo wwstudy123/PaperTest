@@ -1,0 +1,67 @@
+{
+  "numeric_facts_and_evidence_verified": true,
+  "hypotheses_are_unverified_not_causal_rules": true,
+  "reflections": [
+    {
+      "actions": [
+        "adjust_range"
+      ],
+      "conditions": {
+        "environment_key": "d3d6ffd108db565c4da5c5e8c3c78311dd49a33d9bbcb2205442ca14cd1f0349",
+        "objective_key": "tps_per_p95:maximize"
+      },
+      "evidence_ids": [
+        "190465d9b0254ff79d8db4a9286abdc1",
+        "fbe6553888dd411eb5f8a5e626d9fc34",
+        "dd47a89f454b4018afb3b22e2a4846f9",
+        "fac2969cf8fe4512ac94b6e40b3f234f",
+        "93c3c260c89c485cbca94749efaa43d4",
+        "b9709df4c63a49deb0533edfaa27686a",
+        "d7bf89812ebd4613af3619dfded3766a"
+      ],
+      "facts": [
+        {
+          "status": "measured",
+          "trial_id": "190465d9b0254ff79d8db4a9286abdc1",
+          "value": 133.464989
+        },
+        {
+          "status": "measured",
+          "trial_id": "fbe6553888dd411eb5f8a5e626d9fc34",
+          "value": 136.163788
+        },
+        {
+          "status": "measured",
+          "trial_id": "dd47a89f454b4018afb3b22e2a4846f9",
+          "value": 132.550328
+        },
+        {
+          "status": "measured",
+          "trial_id": "fac2969cf8fe4512ac94b6e40b3f234f",
+          "value": 131.790481
+        },
+        {
+          "status": "measured",
+          "trial_id": "93c3c260c89c485cbca94749efaa43d4",
+          "value": 131.299781
+        },
+        {
+          "status": "measured",
+          "trial_id": "b9709df4c63a49deb0533edfaa27686a",
+          "value": 50.027678
+        },
+        {
+          "status": "measured",
+          "trial_id": "d7bf89812ebd4613af3619dfded3766a",
+          "value": 127.963461
+        }
+      ],
+      "hypotheses": [
+        "The baseline configuration (190465d9b0254ff79d8db4a9286abdc1) and its noise calibration replicates (fbe6553888dd411eb5f8a5e626d9fc34-fac2969cf8fe4512ac94b6e40b3f234f) show stable performance around 132-136 TPS/P95.",
+        "Increasing innodb_io_capacity to 400 (93c3c260c89c485cbca94749efaa43d4) did not improve the objective compared to the baseline, suggesting IO capacity is not the current bottleneck or the change introduced overhead.",
+        "Doubling innodb_buffer_pool_size (b9709df4c63a49deb0533edfaa27686a) caused a severe performance degradation (value dropped to ~50), likely due to startup overhead, memory pressure, or cold cache effects indicated by high throttled_period_fraction and low read bytes.",
+        "The verification run (d7bf89812ebd4613af3619dfded3766a) on the baseline config shows a slight decrease in performance compared to 190465d9b0254ff79d8db4a9286abdc1, but remains within the noise range observed in fbe6553888dd411eb5f8a5e626d9fc34-fac2969cf8fe4512ac94b6e40b3f234f."
+      ]
+    }
+  ]
+}

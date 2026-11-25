@@ -1,0 +1,2 @@
+trial,kind,actual_objective,predicted_objective,lower_2_observation_std,upper_2_observation_std,latent_log_std,observation_log_std,absolute_percent_error,covered_2_observation_std,training_n
+8,verification,141.111174,132.85081645132635,130.95178398951654,134.77738824235442,0.0032192094113984394,0.007198811774310443,5.853794079180186,False,6

@@ -1,0 +1,7 @@
+method,source,endpoint_tps,source_baseline_tps,endpoint_kind,same_protocol_across_entire_table
+ADMTune (TPS prototype),local measured,3807.49,2449.19,independent final verification,False
+AgenticDB,AgenticDB Fig5 MS Sysbench Read; vector extraction,5854.859992205,4938.370000003,published curve endpoint,False
+AgentTune,AgenticDB Fig5 MS Sysbench Read; vector extraction,5483.439993978,4938.370000003,published curve endpoint,False
+GPTuner,AgenticDB Fig5 MS Sysbench Read; vector extraction,5596.019995632,4938.370000003,published curve endpoint,False
+CDBTune,AgenticDB Fig5 MS Sysbench Read; vector extraction,4938.370000003,4938.370000003,published curve endpoint,False
+Default,local measured initial configuration,2449.19,2449.19,initial reference,False
