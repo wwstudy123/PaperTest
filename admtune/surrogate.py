@@ -48,7 +48,12 @@ class GaussianProcess:
         d = self.config_dimensions
         return amplitude**2 * (self.matern(a[:, :d], b[:, :d], length) + a[:, d:] @ b[:, d:].T)
 
-    def fit(self, x, y, *, optimize: bool = True):
+    def fit(self, x, y, *, optimize: bool = True, fixed_noise_log_std: float = 0.0):
+        # 显式可选：在训练协方差中加入固定的观测方差，而非事后扩大误差条。
+        # 参数单位与输入y一致（本项目为原始对数目标），不随y标准化尺度漂移。
+        if (isinstance(fixed_noise_log_std, bool) or not isinstance(fixed_noise_log_std, (int, float))
+                or not math.isfinite(fixed_noise_log_std) or fixed_noise_log_std < 0):
+            raise ValueError("Fixed observation noise must be finite, nonnegative log-target units")
         x, y = np.asarray(x, dtype=float), np.asarray(y, dtype=float)
         if (
             x.ndim != 2 or y.shape != (len(x),) or len(x) < 2
@@ -58,11 +63,15 @@ class GaussianProcess:
         self.x = x
         self.y = y.copy()
         self.y_mean, self.y_scale = float(y.mean()), max(float(y.std()), 0.01)
+        self.fixed_noise_log_std = float(fixed_noise_log_std)
+        fixed_scaled = self.fixed_noise_log_std/self.y_scale
+        if not math.isfinite(fixed_scaled) or fixed_scaled > math.sqrt(np.finfo(float).max)/2:
+            raise ValueError("Fixed noise variance is not numerically representable")
         centered = (y - self.y_mean) / self.y_scale
 
         def decompose(theta):
-            noise = np.exp(theta[2])
-            k = self.covariance(x, x, theta) + (noise**2 + 1e-9) * np.eye(len(x))
+            noise_var = np.exp(theta[2])**2 + fixed_scaled**2
+            k = self.covariance(x, x, theta) + (noise_var + 1e-9) * np.eye(len(x))
             lower = np.linalg.cholesky(k)
             alpha = np.linalg.solve(lower.T, np.linalg.solve(lower, centered))
             return lower, alpha
@@ -97,7 +106,7 @@ class GaussianProcess:
     def snapshot(self, training_ids: list[str]) -> dict:
         if not self.fitted or len(training_ids) != len(self.x):
             raise ValueError("Snapshot requires an exact ordered training-ID list")
-        return {
+        payload = {
             "version": self.version, "kernel": self.kernel, "config_dimensions": self.config_dimensions,
             "input_dimensions": self.x.shape[1], "training_ids": training_ids,
             "x": self.x.tolist(), "target": self.y.tolist(),
@@ -106,6 +115,13 @@ class GaussianProcess:
             "hyperparameters": dict(zip(["length_scale", "amplitude", "noise_std"], np.exp(self.theta).tolist())),
             "jitter": 1e-9, "seed": self.seed, "optimizer": self.optimizer,
         }
+        if self.fixed_noise_log_std > 0:
+            payload["noise_policy"] = {
+                "parameterization": "residual_plus_fixed_variance_v1",
+                "fixed_noise_log_std": self.fixed_noise_log_std,
+                "effective_noise_log_std": math.hypot(
+                    self.y_scale*math.exp(self.theta[2]), self.fixed_noise_log_std)}
+        return payload
 
     @classmethod
     def from_snapshot(cls, payload: dict):
@@ -115,7 +131,21 @@ class GaussianProcess:
         model = cls(kernel=payload["kernel"], config_dimensions=int(payload["config_dimensions"]),
                     seed=int(payload["seed"]))
         model.theta = theta
-        model.fit(payload["x"], payload["target"], optimize=False)
+        noise = payload.get("noise_policy")
+        if noise is not None and (
+                not isinstance(noise, dict) or set(noise) != {
+                    "parameterization", "fixed_noise_log_std", "effective_noise_log_std"}
+                or noise["parameterization"] != "residual_plus_fixed_variance_v1"
+                or isinstance(noise["effective_noise_log_std"], bool)
+                or not isinstance(noise["effective_noise_log_std"], (int, float))
+                or not math.isfinite(noise["effective_noise_log_std"])):
+            raise ValueError("Unknown snapshot noise parameterization")
+        model.fit(payload["x"], payload["target"], optimize=False,
+                  fixed_noise_log_std=0.0 if noise is None else noise["fixed_noise_log_std"])
+        if noise is not None and not math.isclose(noise["effective_noise_log_std"],
+                math.hypot(model.y_scale*math.exp(model.theta[2]), model.fixed_noise_log_std),
+                rel_tol=1e-12, abs_tol=1e-12):
+            raise ValueError("Snapshot observation noise mismatch")
         if (len(payload["training_ids"]) != len(model.x)
                 or model.x.shape[1] != payload["input_dimensions"]
                 or not math.isclose(model.y_mean, payload["target_mean"], abs_tol=1e-12)
@@ -135,9 +165,9 @@ class GaussianProcess:
         mean = self.y_mean + self.y_scale * (cross.T @ self.alpha)
         projection = np.linalg.solve(self.lower, cross)
         variance = np.maximum(np.diag(self.covariance(x, x)) - (projection**2).sum(axis=0), 0)
-        noise = np.exp(self.theta[2])
+        noise_var = np.exp(self.theta[2])**2 + (self.fixed_noise_log_std/self.y_scale)**2
         return [
             Prediction(float(m), float(self.y_scale * np.sqrt(v)),
-                       float(self.y_scale * np.sqrt(v + noise**2)), self.version)
+                       float(self.y_scale * np.sqrt(v + noise_var)), self.version)
             for m, v in zip(mean, variance)
         ]

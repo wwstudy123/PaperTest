@@ -211,12 +211,16 @@ def main():
     for key in ("target", "benchmark", "knobs", "output", "restore-audit", "parent-run"):
         parser.add_argument("--"+key, type=Path, required=True)
     parser.add_argument("--dedicated-instance", action="store_true")
+    parser.add_argument("--repeat-aware-audit", action="store_true",
+                        help="仅并发固定配置诊断：封存7/8/9号前的两版GP预测，不调用LLM")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--fixed-rate", type=int, choices=[1000])
     mode.add_argument("--concurrency-probe", action="store_true")
     a = parser.parse_args()
     if not a.dedicated_instance:
         parser.error("必须指定专用实例")
+    if a.repeat_aware_audit and not a.concurrency_probe:
+        parser.error("重复噪声GP验收只允许固定并发三配置协议")
     root = Path(__file__).resolve().parents[1]
     load_dotenv(override=True)
     app = load_app_config(project_root=root, target_path=a.target, benchmark_path=a.benchmark,
@@ -270,6 +274,13 @@ def main():
                 result["concurrency_variables"] = executor.db.show_variables(list(CONCURRENCY_VARIABLES))
             return result
         connector.capture = capture
+        gp_audit = None
+        if a.repeat_aware_audit:
+            from .contracts import fingerprint
+            from .gp_prediction_audit import GPPredictionAudit, AUDIT_POLICY
+            gp_audit = GPPredictionAudit(space, fingerprint({
+                "run": str(a.output.resolve()), "benchmark": asdict(app.benchmark),
+                "space": space.describe(), "audit_policy": AUDIT_POLICY}), a.output/"gp_prediction_audit")
         write_json(a.output/"manifest.json", {"mode": "zero_llm_concurrency_probe" if a.concurrency_probe else
                     ("zero_llm_rate_diagnostic" if a.fixed_rate else "zero_llm_static_diagnostic"),
             "plan": plan(case_names), "case_names": case_names,
@@ -286,7 +297,8 @@ def main():
             "parent_manifest_sha256": hashlib.sha256((a.parent_run/"manifest.json").read_bytes()).hexdigest(),
             "telemetry_scope": "60-second measured command boundaries; excludes 15-second warmup; includes small sampling overhead",
             "cache_protocol": "one initial cold restore; restore Default before/after each trial; balanced Latin blocks; no per-trial cold restore",
-            "created_at_utc": datetime.now(timezone.utc).isoformat(), **source_provenance()})
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            **({"gp_prediction_audit": AUDIT_POLICY} if gp_audit else {}), **source_provenance()})
         for spec in plan(case_names):
             if time.monotonic()-started > 1500:
                 raise TimeoutError("诊断预算1500秒已到，不再提交测量")
@@ -299,6 +311,7 @@ def main():
             connector.boundaries = None
             connector.command_evidence = []
             offset = len(executor.resize_checks)
+            sealed = gp_audit.prepare(records, configs[spec["name"]], time.monotonic()-started) if gp_audit else None
             m = executor.measure(configs[spec["name"]], [0.0])
             boundaries = connector.boundaries
             executor.restore_initial()
@@ -319,6 +332,8 @@ def main():
                       "benchmark_log": str(folder.relative_to(a.output)/m.metadata["benchmark_log"]) if m.metadata.get("benchmark_log") else None}
             if a.concurrency_probe:
                 record["joint_value"] = joint_utility(m.value, m.metadata.get("p95_latency_ms")) if valid else None
+            if gp_audit:
+                record["gp_prediction_audit"] = sealed
             records.append(record)
             with (a.output/"trials.jsonl").open("a") as f:
                 f.write(json.dumps(record, allow_nan=False)+"\n")
