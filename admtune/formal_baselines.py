@@ -8,6 +8,7 @@ import math
 import os
 from pathlib import Path
 import socket
+import shutil
 import time
 
 from dotenv import load_dotenv
@@ -233,6 +234,8 @@ def main():
         parser.error("Explicit dedicated instance and paid-LLM authorization required")
     if a.repeat < 0:
         parser.error("Nonnegative independent repeat ID required")
+    if not shutil.which("mysql") or not shutil.which("sysbench"):
+        parser.error("mysql/sysbench must be on PATH before starting real measurements or paid calls")
     root = Path(__file__).resolve().parents[1]
     load_dotenv(root/".env", override=True)
     app = load_app_config(project_root=root, target_path=a.target, benchmark_path=a.benchmark,

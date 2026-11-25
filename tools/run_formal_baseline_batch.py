@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -23,6 +24,10 @@ def main():
     if not a.dedicated_instance or not a.allow_paid_llm or len(set(a.methods)) != len(a.methods):
         p.error("需要专用实例、收费授权和不重复的方法列表")
     root = Path(__file__).resolve().parents[1]
+    mysql_bin = Path("/root/autodl-tmp/admtune-mysql/mysql-8.0.36-linux-glibc2.17-x86_64-minimal/bin")
+    if not (mysql_bin/"mysql").is_file() or shutil.which("sysbench") is None:
+        p.error("专用 MySQL 客户端或 sysbench 不可用；不能启动收费调用")
+    os.environ["PATH"] = str(mysql_bin)+os.pathsep+os.environ.get("PATH", "")
     a.output.mkdir(mode=0o700, parents=True, exist_ok=False)
     state = {"status": "running", "policy": POLICY, "repeat": a.repeat, "methods": a.methods,
              "started_at_utc": datetime.now(timezone.utc).isoformat(), "finished_methods": []}
