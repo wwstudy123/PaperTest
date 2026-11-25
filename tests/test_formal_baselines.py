@@ -14,6 +14,7 @@ from admtune.composite_static import CompositeExecutor
 from llm_client import LLMClient
 from test_calibration import space
 from test_continuous import FixtureExecutor
+from tools.plot_formal_baselines import plot
 
 
 def record(s, seq=1, value=10, config=None, kind="baseline"):
@@ -61,6 +62,7 @@ class FormalBaselineTests(unittest.TestCase):
         self.assertEqual(child_calls[1][1], child_calls[2][1])
         self.assertEqual(child_calls[0][2], {"temperature": 1, "top_p": .98})
         self.assertEqual({c[1]["parent_feedback"]["trial_id"] for c in child_calls[3:]}, {"2", "3"})
+        self.assertNotIn("innodb_io_capacity", json.dumps(child_calls[0][1]))
 
     def test_agenttune_does_not_expand_until_whole_beam_measured(self):
         s = space(); strategy = AgentTuneStrategy(s, ScriptLLM(s), {}, lambda *a: None)
@@ -177,6 +179,28 @@ class FormalBaselineTests(unittest.TestCase):
             with patch("requests.post") as post, self.assertRaises(ValueError):
                 client._call_openai_compatible("a", operation="test", system_prompt="JSON", **kwargs)
             post.assert_not_called()
+
+    def test_plot_keeps_estimates_out_of_measured_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = {"simulated": False, "method": "Default", "repeat": 0,
+                        "comparison_protocol": {"fixture": True}, "benchmark": {}, "space": []}
+            source = root/"Default"; source.mkdir()
+            (source/"manifest.json").write_text(json.dumps(manifest))
+            (source/"summary.json").write_text(json.dumps({"status": "completed", "completed_trials": 3,
+                "budget": {"llm_calls": 0, "llm_tokens_or_reserved": 0}}))
+            rs = []
+            for i, kind in enumerate(("baseline", "default_repeat", "verification"), 1):
+                r = record(space(), i, kind=kind)
+                r["metadata"].update(seq=i, active_elapsed_seconds=75*i)
+                rs.append(r)
+            (source/"trials.jsonl").write_text("".join(json.dumps(r)+"\n" for r in rs))
+            literature = Path(__file__).resolve().parents[1]/"docs/experiment_data/timed_static_100min_002/literature_curves.csv"
+            rows = plot([source], root/"fig", literature)
+            self.assertEqual([r["method"] for r in rows], ["Default"])
+            estimates = (root/"fig/literature_ratio_curves.csv").read_text()
+            self.assertIn("literature_ratio_estimate", estimates)
+            self.assertTrue((root/"fig/measured_comparison.png").is_file())
 
 
 if __name__ == "__main__":

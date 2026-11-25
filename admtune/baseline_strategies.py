@@ -123,6 +123,10 @@ class AgentTuneStrategy:
         self.selected, self.ranges, self.beam, self.queue = [], {}, [], []
         self.layer_results, self.expected, self.layer = [], 0, 0
 
+    def anonymous_feedback(self, record):
+        # 匿名不能只改当前配置：实测历史和父节点反馈也不能泄露真实旋钮键名。
+        return {**record, "config": {a: record["config"][self.aliases[a]] for a in self.selected}}
+
     def initialize(self):
         for attempt in range(2):
             try:
@@ -197,7 +201,8 @@ class AgentTuneStrategy:
                             "workload": self.workload, "ranges": self.ranges,
                             "knobs": {a: self.space.knobs[self.aliases[a]].description for a in self.selected},
                             "current_configuration": {a: parent["config"][self.aliases[a]] for a in self.selected},
-                            "parent_feedback": parent, "top_performing_memory_window": memory,
+                            "parent_feedback": self.anonymous_feedback(parent),
+                            "top_performing_memory_window": [self.anonymous_feedback(r) for r in memory],
                             "objective": "maximize same-measurement TPS/P95(ms), not TPS alone"},
                             "你是AgentTune的ConfigurationRecommender。根据当前父配置、执行反馈和记忆窗口"
                             "独立采样一个改进配置。必须完整给出所有ranges中的匿名旋钮，不给目录外键；"
