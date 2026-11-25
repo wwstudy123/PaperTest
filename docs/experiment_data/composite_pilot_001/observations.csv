@@ -1,0 +1,2 @@
+trial,kind,valid,accepted,objective_value,tps,p95_ms,accepted_best_objective,active_elapsed_minutes,config_json,mysqld_cpu_cores,throttled_period_fraction
+1,baseline,True,False,133.571663,2441.69,18.28,133.571663,1.3004385163386663,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""innodb_thread_concurrency"": 0, ""sort_buffer_size"": 262144}",8.168893670839651,0.008237232289950576

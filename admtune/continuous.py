@@ -240,7 +240,8 @@ class ContinuousRun:
         diagnostics = {**self.executor.diagnose(), "objective_key": self.objective_key,
                        "protocol": "native Sysbench read-only, uniform random distribution, fixed offered concurrency"}
         if not self.team.selected or not self.team.ranges:
-            self.team.initialize([0.0], self.experiences(), diagnostics=diagnostics)
+            self.team.initialize([0.0], self.experiences(), diagnostics=diagnostics,
+                                 reuse_selection=bool(self.team.selected))
         self.team.diagnostics = diagnostics
         self.journal.put("state", self.save_state())
         candidates = self.team.recommend(self.state["incumbent"], "static-uniform", [0.0], self.experiences())

@@ -30,6 +30,8 @@ PROMPTS = {
         "special 只能选目录中已有的特殊值。不要增加 step、解释或其他字段。"
         "特殊值（如0表示不限制）可以位于普通数值区间外；只放在special，"
         "不要为容纳特殊值而把lower/upper改到目录数值边界之外。"
+        "整数/浮点参数的lower和upper永远必须是数字，即使special只有[0]也不能为null。"
+        "本接口不支持仅特殊值范围；仍需提供合法普通数值区间，不能用null禁用它。"
     ),
     "recommender": (
         "你负责围绕实测父配置 parent 生成数据库配置变更，最多 batch_size 个。"
@@ -179,7 +181,8 @@ class Team:
         self.feedback: dict = {}
         self.diagnostics: dict = {}
 
-    def initialize(self, context: list[float], experiences: list[dict], *, diagnostics: dict | None = None):
+    def initialize(self, context: list[float], experiences: list[dict], *,
+                   diagnostics: dict | None = None, reuse_selection: bool = False):
         if diagnostics is not None:
             self.diagnostics = diagnostics
         payload = {"catalog": self.space.describe(), "context": context,
@@ -187,7 +190,7 @@ class Team:
                    "feedback": self.feedback, "diagnostics": self.diagnostics,
                    "fixed_resource_context": self.space.fixed_resources,
                    "host_memory_budget_bytes": self.space.memory_bytes}
-        selected = self.backend.complete("selector", payload).get("selected")
+        selected = self.selected if reuse_selection else self.backend.complete("selector", payload).get("selected")
         if (
             not isinstance(selected, list) or not selected or len(set(selected)) != len(selected)
             or len(selected) > self.max_selected or set(selected) - set(self.space.names)
@@ -195,7 +198,12 @@ class Team:
             raise ValueError("Invalid selected parameter set")
         self.selected = selected
         output = self.backend.complete("pruner", {**payload, "selected": selected,
-            "catalog": [k for k in payload["catalog"] if k["name"] in selected]})
+            "catalog": [k for k in payload["catalog"] if k["name"] in selected],
+            "numeric_range_contract": {
+                k["name"]: {"lower_upper_must_be_numeric": True, "null_allowed": False,
+                            "special_is_separate": True}
+                for k in payload["catalog"] if k["name"] in selected
+                and k["kind"] in {"integer", "float"}}})
         self.set_ranges(output.get("ranges"))
 
     def set_ranges(self, ranges: dict):
@@ -212,8 +220,12 @@ class Team:
                     raise ValueError("Invalid preferred enum options")
             else:
                 low, high = preferred["lower"], preferred["upper"]
-                if not isinstance(low, (float, int)) or not isinstance(high, (float, int)):
-                    raise ValueError("Numeric preferred bounds required")
+                if (isinstance(low, bool) or isinstance(high, bool)
+                        or not isinstance(low, (float, int)) or not isinstance(high, (float, int))):
+                    raise ValueError(
+                        f"{name}: Numeric preferred bounds required; lower/upper cannot be null or bool, "
+                        f"including with special={preferred['special']}; ordinary bounds must be within "
+                        f"[{knob.lower}, {knob.upper}], step={knob.step}. Special-only ranges unsupported.")
                 if not math.isfinite(low + high) or not knob.lower <= low <= high <= knob.upper:
                     raise ValueError("Preferred range exceeded hard bounds")
                 knob.validate(low)

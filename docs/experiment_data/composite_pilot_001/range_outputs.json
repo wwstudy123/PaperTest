@@ -1,0 +1,66 @@
+[
+  {
+    "call": 2,
+    "role": "pruner",
+    "ranges": {
+      "innodb_buffer_pool_size": {
+        "lower": 1073741824,
+        "upper": 4294967296,
+        "choices": [],
+        "special": []
+      },
+      "innodb_io_capacity": {
+        "lower": 200,
+        "upper": 2000,
+        "choices": [],
+        "special": []
+      },
+      "innodb_io_capacity_max": {
+        "lower": 2000,
+        "upper": 6000,
+        "choices": [],
+        "special": []
+      },
+      "innodb_thread_concurrency": {
+        "lower": null,
+        "upper": null,
+        "choices": [],
+        "special": [
+          0
+        ]
+      }
+    }
+  },
+  {
+    "call": 4,
+    "role": "pruner",
+    "ranges": {
+      "innodb_buffer_pool_size": {
+        "lower": 1073741824,
+        "upper": 4294967296,
+        "choices": [],
+        "special": []
+      },
+      "innodb_io_capacity": {
+        "lower": 200,
+        "upper": 2000,
+        "choices": [],
+        "special": []
+      },
+      "innodb_io_capacity_max": {
+        "lower": 2000,
+        "upper": 6000,
+        "choices": [],
+        "special": []
+      },
+      "innodb_thread_concurrency": {
+        "lower": null,
+        "upper": null,
+        "choices": [],
+        "special": [
+          0
+        ]
+      }
+    }
+  }
+]

@@ -1,0 +1,5 @@
+call,role,total_tokens,elapsed_seconds,status
+1,selector,1421,3.2010535672307014,response
+2,pruner,1587,4.549208663403988,response
+3,selector,1337,3.711988888680935,response
+4,pruner,1506,4.590362057089806,response
