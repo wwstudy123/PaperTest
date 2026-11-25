@@ -7,9 +7,12 @@ sys.path.insert(0,str(ROOT))
 from admtune.static_diagnostic import plan,counter_delta,summarize,CONCURRENCY_NAMES,joint_utility
 root=ROOT
 parser=argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--archive',type=Path,default=ROOT/'runs/archives/concurrency-probe-001.tar.gz')
-parser.add_argument('--output',type=Path,default=ROOT/'runs/collected-concurrency-probe-001')
+parser.add_argument('--run-id',choices=['concurrency-probe-001','uncertainty-repeat-001'],default='concurrency-probe-001')
+parser.add_argument('--archive',type=Path)
+parser.add_argument('--output',type=Path)
 args=parser.parse_args()
+args.archive=args.archive or ROOT/f'runs/archives/{args.run_id}.tar.gz'
+args.output=args.output or ROOT/f'runs/collected-{args.run_id}'
 archive=args.archive;inv=json.loads(archive.with_suffix('.inventory.json').read_text());assert hashlib.sha256(archive.read_bytes()).hexdigest()==inv['archive_sha256']
 dest=args.output;dest.mkdir(mode=0o700,parents=True,exist_ok=False)
 with tarfile.open(archive) as t:
@@ -17,7 +20,7 @@ with tarfile.open(archive) as t:
  for m in members:
   p=Path(m.name);assert m.isfile() and not p.is_absolute() and '..' not in p.parts and p.parts[0]=='runs' and m.size<20_000_000
   data=t.extractfile(m).read();assert hashlib.sha256(data).hexdigest()==inv['files'][m.name];f=dest/p;f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(data);f.chmod(0o600)
-p=dest/'runs/concurrency-probe-001';post=json.loads((dest/'runs/concurrency-probe-001-audit/post_run.json').read_text());manifest=json.loads((p/'manifest.json').read_text());summary=json.loads((p/'summary.json').read_text())
+p=dest/'runs'/args.run_id;post=json.loads((dest/f'runs/{args.run_id}-audit/post_run.json').read_text());manifest=json.loads((p/'manifest.json').read_text());summary=json.loads((p/'summary.json').read_text())
 assert summary['completed'] and summary['completed_trials']==9 and summary['initial_configuration_restored'] and summary['llm_calls']==0
 assert manifest['mode']=='zero_llm_concurrency_probe' and manifest['same_cgroup'] and not manifest['git_dirty'] and not manifest['preflight']['simulated']
 assert post['counts']==[[2000000,1,2000000]]*4 and post['config_sha256']==manifest['preflight']['config_sha256']
@@ -55,7 +58,7 @@ paired=[]
 for block in range(1,4):
  d={r['name']:r for r in rows if r['block']==block};a=d['Concurrency8'];b=d['BufferOnly'];base=d['Default']
  paired.append({'block':block,'concurrency8_vs_buffer_tps_pct':100*(a['tps']/b['tps']-1),'concurrency8_vs_buffer_p95_pct':100*(a['p95_ms']/b['p95_ms']-1),'buffer_vs_default_tps_pct':100*(b['tps']/base['tps']-1),'concurrency8_vs_default_tps_pct':100*(a['tps']/base['tps']-1),'concurrency8_vs_buffer_joint_pct':100*(a['tps_per_p95']/b['tps_per_p95']-1),'concurrency8_vs_default_joint_pct':100*(a['tps_per_p95']/base['tps_per_p95']-1)})
-out=root/'docs/experiment_data/concurrency_probe_001';out.mkdir(parents=True,exist_ok=True)
+out=root/'docs/experiment_data'/args.run_id.replace('-','_');out.mkdir(parents=True,exist_ok=True)
 for name,data in [('observations.csv',rows),('aggregates.csv',aggregates),('paired_blocks.csv',paired)]:
  with (out/name).open('w') as f:w=csv.DictWriter(f,fieldnames=list(data[0]),lineterminator='\n');w.writeheader();w.writerows(data)
 verification={'verified':True,'valid':9,'llm_calls':0,'archive_sha256':inv['archive_sha256'],'config_restored':True,'counts_restored':post['counts'],'git_revision':manifest['git_revision'],'elapsed_seconds':summary['elapsed_seconds'],'aggregates':aggregates,'paired_blocks':paired,'evaluation_objective':manifest['evaluation_objective'],'concurrency_context_restored':post['concurrency_context'],'telemetry_scope':manifest['telemetry_scope'],'cache_protocol':manifest['cache_protocol']}

@@ -1,0 +1,12 @@
+{
+  "canonical_targets.csv": "96418a690340db48c7a3765bf9fd50eb27e4c3e9503b740c861d67d8f78e9489",
+  "models.json": "88ac9766d0da30501c52a49be1e240d7c76e20cde0cb54a2258c61547e4d8b9f",
+  "aggregates.csv": "abcd08c44f674bdacec94f8ab7c79e91f0267cf095424242620dc28a878515de",
+  "holdout_predictions.csv": "4fe8801a72099ee87ff076aa57a75429d09cd429a42ef383b0e918e9961d67b9",
+  "verification.json": "0482f0511a8d8110dddca0835d636df6b85db37e37b070565b9bbb29a73c04ac",
+  "frozen_parent_predictions.csv": "0e83f7c605df94a89ae175f197f7575581200d9e26aadc6ee393e0ee1b5292a0",
+  "paired_blocks.csv": "db74527b7a2a3cfe375766a387d0916815620ea5f1173022a1246bd984368bf6",
+  "holdout_metrics.csv": "7e3d8e1154e429b2dee7b3b5f375baa497f4a827a8d61baafe70755f8ecd4f06",
+  "observations.csv": "ca0edf5f6c22d21d192c5ef5281f6d796c1301d16d97b0a7dd7e18951830a378",
+  "repeat_variability.csv": "59687332506e2924b37558cb8ec47a29d7e3dc454f5a58cb45e948052aba66fe"
+}

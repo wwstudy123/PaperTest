@@ -1,0 +1,195 @@
+{
+  "verified": true,
+  "valid": 9,
+  "llm_calls": 0,
+  "archive_sha256": "6119d1ce90112e48c42869229b42ca82f424faf24b1b16222da4c9e5188c2194",
+  "config_restored": true,
+  "counts_restored": [
+    [
+      2000000,
+      1,
+      2000000
+    ],
+    [
+      2000000,
+      1,
+      2000000
+    ],
+    [
+      2000000,
+      1,
+      2000000
+    ],
+    [
+      2000000,
+      1,
+      2000000
+    ]
+  ],
+  "git_revision": "a5f5330b83afbc17da23d09a90b73656034f8c0d",
+  "elapsed_seconds": 729.3021262586117,
+  "aggregates": [
+    {
+      "name": "Default",
+      "n": 3,
+      "median_tps": 2425.6,
+      "median_p95_ms": 18.28,
+      "median_mean_latency_ms": 13.19,
+      "median_tps_per_p95": 132.69146608315097,
+      "median_mysqld_cpu_cores": 7.645318042391171,
+      "median_cgroup_cpu_cores": 9.681873244074488,
+      "median_throttled_period_pct": 0.16420361247947454,
+      "median_mysqld_read_mib_per_second": 318.12088195585903,
+      "median_innodb_physical_reads_per_1000_transactions": 8496.593650619585,
+      "min_tps": 2419.23,
+      "max_tps": 2431.15
+    },
+    {
+      "name": "BufferOnly",
+      "n": 3,
+      "median_tps": 3830.32,
+      "median_p95_ms": 66.84,
+      "median_mean_latency_ms": 8.35,
+      "median_tps_per_p95": 57.305804907241175,
+      "median_mysqld_cpu_cores": 9.137455600125945,
+      "median_cgroup_cpu_cores": 11.878001366770775,
+      "median_throttled_period_pct": 98.52216748768473,
+      "median_mysqld_read_mib_per_second": 0.0010264437328561333,
+      "median_innodb_physical_reads_per_1000_transactions": 0.01740265390472047,
+      "min_tps": 3815.6,
+      "max_tps": 3903.33
+    },
+    {
+      "name": "Concurrency8",
+      "n": 3,
+      "median_tps": 3768.72,
+      "median_p95_ms": 61.08,
+      "median_mean_latency_ms": 8.49,
+      "median_tps_per_p95": 61.70137524557957,
+      "median_mysqld_cpu_cores": 9.177412468175477,
+      "median_cgroup_cpu_cores": 11.885474513613548,
+      "median_throttled_period_pct": 98.68421052631578,
+      "median_mysqld_read_mib_per_second": 0.0012849430080757887,
+      "median_innodb_physical_reads_per_1000_transactions": 0.02210540742476425,
+      "min_tps": 3732.44,
+      "max_tps": 3820.28
+    }
+  ],
+  "paired_blocks": [
+    {
+      "block": 1,
+      "concurrency8_vs_buffer_tps_pct": -2.1794737393856733,
+      "concurrency8_vs_buffer_p95_pct": -8.617594254937167,
+      "buffer_vs_default_tps_pct": 56.94630113320856,
+      "concurrency8_vs_default_tps_pct": 53.525697715073115,
+      "concurrency8_vs_buffer_joint_pct": 7.045251723304857,
+      "concurrency8_vs_default_joint_pct": -54.05288549064282
+    },
+    {
+      "block": 2,
+      "concurrency8_vs_buffer_tps_pct": -1.6082207230727508,
+      "concurrency8_vs_buffer_p95_pct": -8.617594254937167,
+      "buffer_vs_default_tps_pct": 57.91226912928762,
+      "concurrency8_vs_default_tps_pct": 55.372691292875984,
+      "concurrency8_vs_buffer_joint_pct": 7.670375358052017,
+      "concurrency8_vs_default_joint_pct": -53.50011793002991
+    },
+    {
+      "block": 3,
+      "concurrency8_vs_buffer_tps_pct": -2.127670476234389,
+      "concurrency8_vs_buffer_p95_pct": -10.248354278874928,
+      "buffer_vs_default_tps_pct": 61.34596545181732,
+      "concurrency8_vs_default_tps_pct": 57.913054980303656,
+      "concurrency8_vs_buffer_joint_pct": 9.047949747766193,
+      "concurrency8_vs_default_joint_pct": -51.88113610535171
+    }
+  ],
+  "evaluation_objective": "tps_per_p95:maximize",
+  "concurrency_context_restored": {
+    "innodb_adaptive_max_sleep_delay": 150000,
+    "innodb_concurrency_tickets": 5000,
+    "innodb_thread_concurrency": 0,
+    "innodb_thread_sleep_delay": 10000
+  },
+  "telemetry_scope": "60-second measured command boundaries; excludes 15-second warmup; includes small sampling overhead",
+  "cache_protocol": "one initial cold restore; restore Default before/after each trial; balanced Latin blocks; no per-trial cold restore",
+  "protocol": "UNCERTAINTY_REPEAT_PROTOCOL_20261125",
+  "calibration_sequences": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "holdout_sequences": [
+    7,
+    8,
+    9
+  ],
+  "pooled_log_noise": {
+    "variance": 1.8936822529675955e-05,
+    "std": 0.004351645956379719,
+    "sse": 5.681046758902786e-05,
+    "degrees_of_freedom": 3,
+    "training_sequences": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ]
+  },
+  "holdout_metrics": [
+    {
+      "model": "Frozen7",
+      "holdout_n": 3,
+      "covered": 2,
+      "coverage": 0.6666666666666666,
+      "mape_pct": 17.365557678503116,
+      "mean_interval_width": 109.7649899650357
+    },
+    {
+      "model": "Frozen7+floor",
+      "holdout_n": 3,
+      "covered": 3,
+      "coverage": 1,
+      "mape_pct": 17.365557678503116,
+      "mean_interval_width": 110.4435504466923
+    },
+    {
+      "model": "Refit6",
+      "holdout_n": 3,
+      "covered": 1,
+      "coverage": 0.3333333333333333,
+      "mape_pct": 2.002604422032269,
+      "mean_interval_width": 1.7867765253512597
+    },
+    {
+      "model": "Refit6+floor",
+      "holdout_n": 3,
+      "covered": 1,
+      "coverage": 0.3333333333333333,
+      "mape_pct": 2.002604422032269,
+      "mean_interval_width": 1.7867926467005735
+    }
+  ],
+  "frozen_parent_training_n": 7,
+  "refit_training_n": 6,
+  "refit_hyperparameters": {
+    "length_scale": 0.061441862236863154,
+    "amplitude": 0.9999460662642886,
+    "noise_std": 0.011402618134833651
+  },
+  "refit_optimizer": {
+    "optimized": true,
+    "success": true,
+    "negative_log_marginal_likelihood": -3.868441810657383,
+    "iterations": 25
+  },
+  "frozen_noise_log_std": 0.0004270630212620236,
+  "refit_noise_log_std": 0.004351587065998865,
+  "online_model_changed": false,
+  "offline_time_split_not_online_prediction": true
+}
