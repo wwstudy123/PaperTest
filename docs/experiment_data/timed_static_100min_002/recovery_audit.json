@@ -1,0 +1,12 @@
+{
+  "at_utc": "2026-11-25T01:14:57.324633+00:00",
+  "old_completed": 22,
+  "old_pending_seq": 23,
+  "old_records_modified": false,
+  "initial_config_sha256": "fc4c0279d9c6c7ff843b5404a045660d4c835478addbaaf2a040653f82dc40c3",
+  "archive_sha256": "b77ba7c4fd2314893ffb857f7457e3abdb1a06017e49bb7eed6f232073370198",
+  "archive_bytes": 58628,
+  "mysqld_started": true,
+  "new_run": "timed-static-100min-002",
+  "reason": "new independent 100-minute budget; old interrupted run retained without invented result"
+}

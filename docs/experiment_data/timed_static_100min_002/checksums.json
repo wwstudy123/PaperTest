@@ -1,0 +1,10 @@
+{
+  "admtune_trials.csv": "fc7e148bad87b9ad45f899a039f9a9bd5f436d2da6f9c2d6551035faccf3a093",
+  "predictions.csv": "daa72839b9a9d350db0e30bbb0d2ef3d22e62cdd98474d393e8bd6d4d5a80574",
+  "comparison_curve.csv": "9389953ea3c0cee2eba7c1d8ecdfcf249c9d130416f5568c7be70a1b4bddb438",
+  "recovery_audit.json": "a3c10051076f263d9af27bfb55e1d9fdca494647cd4779e9d079031794ea8076",
+  "literature_provenance.json": "a4b2ba8d9f21728ac2dc9c71be30c9a90ffb3cc8b368daccba2da643a70552ff",
+  "verification.json": "4f00b7c6c28e0fab67f0bd12844ac14b5582537302bd9d71c41f02fe79b96b6f",
+  "final_gp.json": "251101907d13031b6ce71ad12f410d868501786686ad45e1f74b31020f3de5c2",
+  "literature_curves.csv": "ac08375ad1a53309b071808317d278e4bd33115cbb2f6ae8ab39de152999b761"
+}

@@ -1,0 +1,69 @@
+{
+  "verified": true,
+  "archive_sha256": "1fdbb5619a3529ee4a1dc16839aa6e801cf1fe5cbf64b343ce0eab94ae4c1c86",
+  "attempts": 71,
+  "valid": 71,
+  "counts_by_kind": {
+    "baseline": 1,
+    "startup": 4,
+    "audit": 7,
+    "incumbent_repeat": 37,
+    "candidate": 14,
+    "reference": 6,
+    "verification": 2
+  },
+  "unique_configs": 26,
+  "baseline_tps": 2449.19,
+  "verification_tps": 3807.49,
+  "best_observed_search_tps": 3931.63,
+  "accepted_search_value": 3931.63,
+  "verification_vs_own_baseline_pct": 55.45915180120773,
+  "reference_median_tps": 2437.0,
+  "verification_vs_interleaved_reference_pct": 56.236766516208434,
+  "baseline_p95_ms": 18.28,
+  "verification_p95_ms": 68.05,
+  "llm_calls": 13,
+  "known_tokens": 23187,
+  "charged_tokens_or_reserved": 23187,
+  "reflection_count": 7,
+  "reflected_records": 70,
+  "final_gp_training_count": 71,
+  "prospective_forecast_groups": {
+    "audit": {
+      "n": 6,
+      "mape_pct": 5.359748608722978,
+      "coverage": 0.8333333333333334
+    },
+    "incumbent_repeat": {
+      "n": 37,
+      "mape_pct": 1.6281500830536133,
+      "coverage": 0.7837837837837838
+    },
+    "candidate": {
+      "n": 14,
+      "mape_pct": 3.4564889673384003,
+      "coverage": 1.0
+    },
+    "reference": {
+      "n": 6,
+      "mape_pct": 1.3718903532331868,
+      "coverage": 0.8333333333333334
+    },
+    "verification": {
+      "n": 2,
+      "mape_pct": 1.2138772862329283,
+      "coverage": 1.0
+    }
+  },
+  "active_seconds": 5868.332489311695,
+  "session_seconds": 5868.333045743406,
+  "last_trial_elapsed_seconds": 5867.72347407788,
+  "incumbent": {
+    "innodb_buffer_pool_size": 4294967296,
+    "innodb_io_capacity": 1200,
+    "innodb_io_capacity_max": 4500,
+    "sort_buffer_size": 262144
+  },
+  "git_revision": "26687eb4259e56c439edddc7e568cddd21b636d0",
+  "can_resume": true
+}

@@ -1,0 +1,17 @@
+{
+  "version": 66,
+  "kernel": "joint",
+  "config_dimensions": 4,
+  "input_dimensions": 5,
+  "hyperparameters": {
+    "length_scale": 0.4820525324708844,
+    "amplitude": 1.394314430351689,
+    "noise_std": 0.13423705645741035
+  },
+  "jitter": 1e-09,
+  "optimizer": {
+    "optimized": false,
+    "reused_hyperparameters": true
+  },
+  "training_count": 71
+}

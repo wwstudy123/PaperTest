@@ -1,12 +1,16 @@
 """用经过原始日志核验的100分钟预算实验绘图，禁止模拟填值。"""
-import csv,json,math
+import argparse,csv,json,math
 from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 ROOT=Path(__file__).resolve().parents[2]
-DATA=ROOT/'docs/experiment_data/timed_static_100min_001'
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--data',type=Path,default=ROOT/'docs/experiment_data/timed_static_100min_002')
+args=parser.parse_args()
+DATA=args.data
+RUN_ID=DATA.name.replace('_','-')
 OUT=ROOT/'docs/figures'
 verification=json.loads((DATA/'verification.json').read_text())
 assert verification['verified'] and 2<=verification['attempts']<=100
@@ -55,14 +59,14 @@ for method in methods:
   sec,y=points('throughput',method);x=[s/60 for s in sec]
   ax.plot(x,y,label=method,color=colors[method],marker=markers[method],ms=4.5 if method=='ADMTune' else 3.4,lw=1.6 if method=='ADMTune' else 1.05,markevery=max(1,len(x)//9),zorder=5 if method=='ADMTune' else 3)
   for i,(t,v) in enumerate(zip(x,y)):
-   combined.append({'method':method,'time_min':t,'throughput_tps':v,'series_kind':'best_found_observed' if method=='ADMTune' else 'published_vector_vertex','source':'timed-static-100min-001' if method=='ADMTune' else 'AgenticDB_Fig5_MS_Sysbench_Read','trial':own[i]['trial'] if method=='ADMTune' else ''})
+   combined.append({'method':method,'time_min':t,'throughput_tps':v,'series_kind':'best_found_observed' if method=='ADMTune' else 'published_vector_vertex','source':RUN_ID if method=='ADMTune' else 'AgenticDB_Fig5_MS_Sysbench_Read','trial':own[i]['trial'] if method=='ADMTune' else ''})
 style(ax,'Throughput (TPS)');ax.set_ylim(0,max(r['throughput_tps'] for r in combined)*1.1)
 ax.set_title('Sysbench Read-only')
 fig.legend(*ax.get_legend_handles_labels(),loc='upper center',bbox_to_anchor=(.5,1.015),ncol=3,frameon=False,columnspacing=1.25,handlelength=2)
 fig.subplots_adjust(top=.79,bottom=.15,left=.12,right=.98)
 save(fig,'admtune_100min_comparison')
 with (DATA/'comparison_curve.csv').open('w') as f:
- w=csv.DictWriter(f,fieldnames=list(combined[0]));w.writeheader();w.writerows(combined)
+ w=csv.DictWriter(f,fieldnames=list(combined[0]),lineterminator="\n");w.writeheader();w.writerows(combined)
 
 # 独立展示同一容器、同一协议的真实调优，末端星号为独立复测。
 fig,axes=plt.subplots(1,2,figsize=(10,3.9))
