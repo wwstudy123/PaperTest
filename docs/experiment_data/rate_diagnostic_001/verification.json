@@ -1,0 +1,111 @@
+{
+  "verified": true,
+  "valid": 9,
+  "llm_calls": 0,
+  "archive_sha256": "009c064ca9324d7609eb7854e0001e98f319ee47fa4b422ba1d3adb45e2f2a49",
+  "config_restored": true,
+  "counts_restored": [
+    [
+      2000000,
+      1,
+      2000000
+    ],
+    [
+      2000000,
+      1,
+      2000000
+    ],
+    [
+      2000000,
+      1,
+      2000000
+    ],
+    [
+      2000000,
+      1,
+      2000000
+    ]
+  ],
+  "git_revision": "190c9e08acdc861241531ac37edb9ba3951d22fa",
+  "elapsed_seconds": 726.4868807345629,
+  "aggregates": [
+    {
+      "name": "Default",
+      "n": 3,
+      "median_tps": 994.45,
+      "median_p95_ms": 8.9,
+      "median_mean_latency_ms": 6.81,
+      "median_tps_per_p95": 111.73483146067416,
+      "median_mysqld_cpu_cores": 3.485817410072858,
+      "median_cgroup_cpu_cores": 4.441109085790255,
+      "median_throttled_period_pct": 0.0,
+      "median_achieved_fraction": 0.9944500000000001,
+      "median_max_reported_queue": 1,
+      "median_mysqld_read_mib_per_second": 125.5036773224152,
+      "median_innodb_physical_reads_per_1000_transactions": 8186.601427661784,
+      "min_tps": 994.44,
+      "max_tps": 996.48
+    },
+    {
+      "name": "BufferOnly",
+      "n": 3,
+      "median_tps": 994.44,
+      "median_p95_ms": 4.82,
+      "median_mean_latency_ms": 3.57,
+      "median_tps_per_p95": 206.31535269709545,
+      "median_mysqld_cpu_cores": 3.0357569153096136,
+      "median_cgroup_cpu_cores": 3.959202186489095,
+      "median_throttled_period_pct": 0.0,
+      "median_achieved_fraction": 0.9944400000000001,
+      "median_max_reported_queue": 1,
+      "median_mysqld_read_mib_per_second": 0.8236534937022925,
+      "median_innodb_physical_reads_per_1000_transactions": 53.75515265256878,
+      "min_tps": 994.42,
+      "max_tps": 994.44
+    },
+    {
+      "name": "ADMTuneConfig",
+      "n": 3,
+      "median_tps": 994.44,
+      "median_p95_ms": 4.82,
+      "median_mean_latency_ms": 3.54,
+      "median_tps_per_p95": 206.31120331950206,
+      "median_mysqld_cpu_cores": 3.0140031245993844,
+      "median_cgroup_cpu_cores": 3.9377302750434895,
+      "median_throttled_period_pct": 0.0,
+      "median_achieved_fraction": 0.9944400000000001,
+      "median_max_reported_queue": 1,
+      "median_mysqld_read_mib_per_second": 0.763743238333719,
+      "median_innodb_physical_reads_per_1000_transactions": 49.8508663158953,
+      "min_tps": 994.42,
+      "max_tps": 994.44
+    }
+  ],
+  "paired_blocks": [
+    {
+      "block": 1,
+      "full_vs_buffer_tps_pct": 0.0,
+      "full_vs_buffer_p95_pct": 1.8672199170124415,
+      "buffer_vs_default_tps_pct": -0.0010055809744113908,
+      "full_vs_default_tps_pct": -0.0010055809744113908
+    },
+    {
+      "block": 2,
+      "full_vs_buffer_tps_pct": 0.0,
+      "full_vs_buffer_p95_pct": 0.0,
+      "buffer_vs_default_tps_pct": 0.0,
+      "full_vs_default_tps_pct": 0.0
+    },
+    {
+      "block": 3,
+      "full_vs_buffer_tps_pct": 0.0,
+      "full_vs_buffer_p95_pct": -1.8329938900203624,
+      "buffer_vs_default_tps_pct": -0.2067276814386676,
+      "full_vs_default_tps_pct": -0.2067276814386676
+    }
+  ],
+  "fixed_rate_tps": 1000,
+  "achieved_tolerance_fraction": 0.05,
+  "telemetry_scope": "60-second measured command boundaries; excludes 15-second warmup; includes small sampling overhead",
+  "cache_protocol": "one initial cold restore; restore Default before/after each trial; balanced Latin blocks; no per-trial cold restore"
+}
