@@ -47,6 +47,14 @@ class Reflector:
             "record_context": [
                 {"trial_id": t.trial_id, "config": t.config, "phase_id": t.phase_id,
                  "kind": t.metadata.get("kind"), "constraints_ok": t.constraints_ok}
+                | ({"raw_tps": t.metadata["raw_tps"], "p95_latency_ms": t.metadata.get("p95_latency_ms"),
+                    "label_precision_decimals": t.metadata.get("label_precision_decimals"),
+                    "measured_telemetry": {
+                        k: ((t.metadata.get("telemetry") or {}).get("delta") or {}).get(k)
+                        for k in ("cgroup_cpu_cores", "throttled_period_fraction",
+                                  "mysqld_read_bytes", "boundary_elapsed_seconds")},
+                    "value_semantics": "facts.value is the canonical rounded TPS/P95; copy, do not recompute"}
+                   if "raw_tps" in t.metadata else {})
                 for t in records
             ],
         }

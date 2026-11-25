@@ -176,6 +176,8 @@ class DurableLedger(Ledger):
 
 
 class ContinuousRun:
+    objective_key = "tps:maximize"
+
     def __init__(self, journal, executor, space, environment, output, backend, ledger, seed=42):
         self.journal, self.executor, self.space = journal, executor, space
         self.environment, self.output, self.ledger = environment, output, ledger
@@ -202,6 +204,9 @@ class ContinuousRun:
 
     def fit(self):
         history = [t for t in self.store.trials() if t.trainable and t.constraints_ok]
+        if any(t.objective_key != self.objective_key or t.environment_key != self.environment.key
+               for t in history):
+            raise ValueError("Refuse mixed objective/environment GP labels")
         ids = [t.trial_id for t in history]
         if len(history) < 6 or (self.state.get("gp") and self.state["gp"]["training_ids"] == ids):
             return
@@ -232,7 +237,7 @@ class ContinuousRun:
     def replenish(self, seq):
         if self.state["pool"] or seq < self.state["next_proposal_at"]:
             return
-        diagnostics = {**self.executor.diagnose(), "objective_key": "tps:maximize",
+        diagnostics = {**self.executor.diagnose(), "objective_key": self.objective_key,
                        "protocol": "native Sysbench read-only, uniform random distribution, fixed offered concurrency"}
         if not self.team.selected or not self.team.ranges:
             self.team.initialize([0.0], self.experiences(), diagnostics=diagnostics)
@@ -300,7 +305,7 @@ class ContinuousRun:
         measured.metadata["resize_checks"] = getattr(self.executor, "resize_checks", [])[resize_offset:]
         if measured.metadata.get("benchmark_log"):
             measured.metadata["benchmark_log"] = str(folder.relative_to(self.output) / measured.metadata["benchmark_log"])
-        record = Trial(submitted["trial_id"], "static-uniform", self.environment.key, "tps:maximize",
+        record = Trial(submitted["trial_id"], "static-uniform", self.environment.key, self.objective_key,
                        config, [0.0], measured.status, measured.value, measured.complete,
                        measured.effective, measured.constraints_ok, prediction,
                        {**measured.metadata, "seq": seq, "kind": kind, "decision": decision,
@@ -315,6 +320,11 @@ class ContinuousRun:
                 record.metadata["accepted"] = True
         self.team.feedback = {"trial_id": record.trial_id, "status": record.status,
                               "value": record.value, "accepted": record.metadata["accepted"]}
+        if "raw_tps" in record.metadata:
+            self.team.feedback.update(objective_key=self.objective_key,
+                                      raw_tps=record.metadata["raw_tps"],
+                                      p95_ms=record.metadata.get("p95_latency_ms"),
+                                      label_precision_decimals=record.metadata.get("label_precision_decimals"))
         self.journal.finish(submitted, record, self.save_state())
         self.ledger.persist()
         if kind == "baseline" and (not record.trainable or not record.constraints_ok):

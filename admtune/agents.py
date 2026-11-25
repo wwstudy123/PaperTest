@@ -28,6 +28,8 @@ PROMPTS = {
         '仅返回一个 JSON 对象：{"ranges":{"参数名":{"lower":数值或null,"upper":数值或null,"choices":[],"special":[]}}}。'
         "每项严格保留这四个字段；数值参数的 choices 为空数组，枚举参数的 lower/upper 为 null。"
         "special 只能选目录中已有的特殊值。不要增加 step、解释或其他字段。"
+        "特殊值（如0表示不限制）可以位于普通数值区间外；只放在special，"
+        "不要为容纳特殊值而把lower/upper改到目录数值边界之外。"
     ),
     "recommender": (
         "你负责围绕实测父配置 parent 生成数据库配置变更，最多 batch_size 个。"
@@ -37,6 +39,7 @@ PROMPTS = {
         "以 diagnostics.objective_key 为准；minimize 表示越低越好，不默认最大化历史数值。"
         '仅返回一个 JSON 对象：{"candidates":[{"参数名":具体数值或枚举值}]}。'
         "每项直接是变更字典，不嵌套 config，不增加说明字段，不虚构实测收益。"
+        "ranges.special包含0时可以直接推荐0；未改参数的特殊默认值照常继承。"
     ),
     "reflection": (
         "你负责归纳新增执行证据，旧摘要只作背景。仅输出一个 JSON 对象，含 facts、hypotheses、conditions、actions、"
