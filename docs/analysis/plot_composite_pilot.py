@@ -1,13 +1,20 @@
 """绘制本轮真实综合目标闭环；不拼接旧目标、限速实验或论文基线。"""
 from pathlib import Path
+import argparse
 import csv
 import json
+import re
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 ROOT = Path(__file__).resolve().parents[2]
-data = ROOT / "docs/experiment_data/composite_pilot_001"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--run-id", default="composite-pilot-001")
+args = parser.parse_args()
+if not re.fullmatch(r"composite-pilot-\d{3}", args.run_id):
+    parser.error("run-id必须采用composite-pilot-NNN格式")
+data = ROOT / "docs/experiment_data" / args.run_id.replace("-", "_")
 verified = json.loads((data / "verification.json").read_text())
 assert verified["verified"] and verified["objective"] == "tps_per_p95:maximize"
 if not verified["independent_verification_available"]:
@@ -44,7 +51,7 @@ fig.text(.5, .025,
          f"Real LLM pilot; {verified['trials']} measurements, "
          f"{verified['llm_calls']} API calls. Single run; raw observations, not multi-seed averages.",
          ha="center", fontsize=8)
-dest = ROOT / "docs/figures/composite_pilot_001"
+dest = ROOT / "docs/figures" / args.run_id.replace("-", "_")
 dest.parent.mkdir(exist_ok=True, parents=True)
 for extension in (".png", ".pdf"):
     fig.savefig(dest.with_suffix(extension), dpi=280, bbox_inches="tight")

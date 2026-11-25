@@ -36,11 +36,14 @@ def write_csv(path, rows):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--archive", type=Path,
-                        default=ROOT / "runs/archives/composite-pilot-001.tar.gz")
-    parser.add_argument("--output", type=Path,
-                        default=ROOT / "runs/collected-composite-pilot-001")
+    parser.add_argument("--run-id", default="composite-pilot-001")
+    parser.add_argument("--archive", type=Path)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    if not re.fullmatch(r"composite-pilot-\d{3}", args.run_id):
+        parser.error("run-id必须采用composite-pilot-NNN格式")
+    args.archive = args.archive or ROOT / f"runs/archives/{args.run_id}.tar.gz"
+    args.output = args.output or ROOT / f"runs/collected-{args.run_id}"
     inventory = load(args.archive.with_suffix(".inventory.json"))
     assert hashlib.sha256(args.archive.read_bytes()).hexdigest() == inventory["archive_sha256"]
     args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
@@ -59,8 +62,8 @@ def main():
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(data)
             out.chmod(0o600)
-    p = args.output / "runs/composite-pilot-001"
-    audit = args.output / "runs/composite-pilot-001-audit"
+    p = args.output / "runs" / args.run_id
+    audit = args.output / "runs" / f"{args.run_id}-audit"
     summary, manifest, post = (load(p / "summary.json"), load(p / "manifest.json"),
                                load(audit / "post_run.json"))
     runtime = load(audit / "runtime.json")
@@ -144,6 +147,10 @@ def main():
                 forecasts.append({
                     "trial": seq, "kind": meta["kind"], "actual_objective": r["value"],
                     "predicted_objective": math.exp(pred["mean"]),
+                    "lower_2_observation_std": math.exp(pred["mean"]-2*pred["observation_std"]),
+                    "upper_2_observation_std": math.exp(pred["mean"]+2*pred["observation_std"]),
+                    "latent_log_std": pred["latent_std"],
+                    "observation_log_std": pred["observation_std"],
                     "absolute_percent_error": abs(math.exp(pred["mean"])/r["value"]-1)*100,
                     "covered_2_observation_std": abs(math.log(r["value"])-pred["mean"]) <= 2*pred["observation_std"],
                     "training_n": len(saved["training_ids"])})
@@ -154,6 +161,7 @@ def main():
             "active_elapsed_minutes": meta["active_elapsed_seconds"]/60,
             "config_json": json.dumps(r["config"], sort_keys=True),
             "mysqld_cpu_cores": (meta.get("telemetry") or {}).get("delta", {}).get("mysqld_cpu_cores"),
+            "cgroup_cpu_cores": (meta.get("telemetry") or {}).get("delta", {}).get("cgroup_cpu_cores"),
             "throttled_period_fraction": (meta.get("telemetry") or {}).get("delta", {}).get("throttled_period_fraction")})
     curve = list(csv.DictReader((p / "curve.csv").open()))
     assert len(curve) == len(records)
@@ -162,6 +170,39 @@ def main():
         assert float(row["p95_ms"]) == r["metadata"]["p95_latency_ms"]
         assert float(row["objective_value"]) == r["value"]
     events, refs = lines(p / "events.jsonl"), load(p / "reflections.json")
+    decisions = []
+    models_by_version = {s["version"]: s for s, _ in snapshots.values()}
+    decision_inputs = [
+        (r["metadata"]["seq"], "selected", r["metadata"]["decision"], r["config"])
+        for r in records if r["metadata"]["kind"] == "candidate"]
+    decision_inputs += [
+        (e["payload"]["next_seq"], "refused", e["payload"], None)
+        for e in events if e["kind"] == "prescreen_refused"]
+    for seq, outcome, decision, config in decision_inputs:
+        assert decision["rule"] == "GP_LCB_then_UCB"
+        prior = [r for r in records if r["metadata"]["seq"] < seq]
+        incumbent_score = prior[0]["value"]
+        for r in prior:
+            if r["metadata"]["accepted"]:
+                incumbent_score = r["value"]
+        floor, gain = math.log(prior[0]["value"]*.9), math.log(incumbent_score*1.01)
+        preds = decision["predictions"]
+        assert len(preds) == len(decision["config_ids"])
+        eligible = [i for i, pred in enumerate(preds)
+                    if pred["mean"]-2*pred["latent_std"] >= floor
+                    and pred["mean"]+2*pred["latent_std"] > gain]
+        assert eligible == decision["eligible"]
+        for pred in preds:
+            saved = models_by_version[pred["model_version"]]
+            assert all(byid[ident]["metadata"]["seq"] < seq for ident in saved["training_ids"])
+        if outcome == "refused":
+            assert not eligible
+        else:
+            chosen = max(eligible, key=lambda i: preds[i]["mean"]+2*preds[i]["latent_std"])
+            assert decision["config_ids"][chosen] == fingerprint(config)
+        decisions.append({"next_trial": seq, "outcome": outcome, "pool_size": len(preds),
+                          "eligible": len(eligible), "training_n": len(saved["training_ids"]),
+                          "floor_objective": math.exp(floor), "required_gain_objective": math.exp(gain)})
     covered = set()
     for ref in refs:
         assert not set(ref["evidence_ids"]) - set(byid)
@@ -196,7 +237,8 @@ def main():
     assert post["concurrency_context"] == manifest["preflight"]["concurrency_initial"]
     first, last = records[0], records[-1]
     result = {
-        "verified": True, "closed_loop_verified": summary.get("closed_loop_verified", False),
+        "verified": True, "run_id": args.run_id,
+        "closed_loop_verified": summary.get("closed_loop_verified", False),
         "status": summary["status"], "error": summary.get("error"), "objective": manifest["objective"],
         "archive_sha256": inventory["archive_sha256"], "git_revision": manifest["git_revision"],
         "trials": len(records), "valid": sum(r["valid"] for r in rows),
@@ -220,11 +262,22 @@ def main():
         "prediction_mape_pct": statistics.mean(f["absolute_percent_error"] for f in forecasts) if forecasts else None,
         "prediction_coverage": statistics.mean(f["covered_2_observation_std"] for f in forecasts) if forecasts else None,
         "gp_hyperparameters": (state.get("gp") or {}).get("hyperparameters"),
+        "gp_kernel": (state.get("gp") or {}).get("kernel"),
+        "gp_final_optimizer": (state.get("gp") or {}).get("optimizer"),
     }
-    public = ROOT / "docs/experiment_data/composite_pilot_001"
+    public = ROOT / "docs/experiment_data" / args.run_id.replace("-", "_")
     public.mkdir(parents=True, exist_ok=True)
     write_csv(public / "observations.csv", rows)
     write_csv(public / "predictions.csv", forecasts)
+    write_csv(public / "decisions.csv", decisions)
+    write_csv(public / "gp_fits.csv", [{
+        "version": s["version"], "training_n": len(s["training_ids"]), "kernel": s["kernel"],
+        **s["hyperparameters"], "target_log_scale": s["target_scale"],
+        "noise_log_units": s["hyperparameters"]["noise_std"]*s["target_scale"],
+        "optimized": s["optimizer"]["optimized"],
+        "optimizer_success": s["optimizer"].get("success"),
+        "negative_log_marginal_likelihood": s["optimizer"].get("negative_log_marginal_likelihood")}
+        for s, _ in snapshots.values()])
     write_csv(public / "llm_usage.csv", [
         {"call": i+1, "role": t["role"], "total_tokens": (t.get("usage") or {}).get("total_tokens"),
          "elapsed_seconds": t.get("elapsed_seconds"), "status": "error" if t.get("error") else "response"}
@@ -233,6 +286,10 @@ def main():
         {"call": i+1, "role": t["role"], "ranges": t.get("response", {}).get("ranges")}
         for i, t in enumerate(traces) if t["role"] == "pruner"],
         ensure_ascii=False, indent=2)+"\n")
+    (public / "reflections.json").write_text(json.dumps({
+        "numeric_facts_and_evidence_verified": True,
+        "hypotheses_are_unverified_not_causal_rules": True,
+        "reflections": refs}, ensure_ascii=False, indent=2)+"\n")
     (public / "verification.json").write_text(json.dumps(result, ensure_ascii=False, indent=2)+"\n")
     (public / "checksums.json").write_text(json.dumps({
         f.name: hashlib.sha256(f.read_bytes()).hexdigest()

@@ -1,0 +1,70 @@
+{
+  "verified": true,
+  "run_id": "composite-pilot-002",
+  "closed_loop_verified": true,
+  "status": "completed",
+  "error": null,
+  "objective": "tps_per_p95:maximize",
+  "archive_sha256": "db009803147e9a120a3afa7af396fca29ef443c5ed42189b2d0c55d3e3ad425c",
+  "git_revision": "761ae119bb6683849dcc7463173c0557ceda05a8",
+  "trials": 7,
+  "valid": 7,
+  "unique_configs": 6,
+  "counts_by_kind": {
+    "audit": 1,
+    "baseline": 1,
+    "startup": 4,
+    "verification": 1
+  },
+  "accepted_at": [],
+  "baseline_tps": 2449.99,
+  "baseline_p95_ms": 18.28,
+  "baseline_objective": 134.025711,
+  "last_tps": 2396.99,
+  "last_p95_ms": 18.61,
+  "last_objective": 128.801182,
+  "last_kind": "verification",
+  "independent_verification_available": true,
+  "last_objective_vs_baseline_pct": -3.8981542877246866,
+  "search_value": 134.025711,
+  "incumbent": {
+    "innodb_buffer_pool_size": 1073741824,
+    "innodb_io_capacity": 200,
+    "innodb_io_capacity_max": 2000,
+    "innodb_thread_concurrency": 0,
+    "sort_buffer_size": 262144
+  },
+  "llm_calls": 5,
+  "known_tokens": 10641,
+  "charged_tokens_or_reserved": 10641,
+  "roles": [
+    "selector",
+    "pruner",
+    "recommender",
+    "recommender",
+    "reflection"
+  ],
+  "model": "qwen3.7-plus",
+  "gp_training_count": 7,
+  "prospective_predictions": 1,
+  "gp_rejections": 2,
+  "refresh_count": 1,
+  "reflection_count": 1,
+  "reflected_records": 7,
+  "reflection_error": null,
+  "stop_reason": "No admissible novel candidate after one bounded refresh",
+  "active_seconds": 600.264450147748,
+  "initial_restored": true,
+  "prediction_mape_pct": 4.056217469815793,
+  "prediction_coverage": 0,
+  "gp_hyperparameters": {
+    "length_scale": 0.12642159302057726,
+    "amplitude": 0.9958431647471783,
+    "noise_std": 0.0009118819655545162
+  },
+  "gp_kernel": "joint",
+  "gp_final_optimizer": {
+    "optimized": false,
+    "reused_hyperparameters": true
+  }
+}

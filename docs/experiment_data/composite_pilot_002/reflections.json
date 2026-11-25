@@ -1,0 +1,66 @@
+{
+  "numeric_facts_and_evidence_verified": true,
+  "hypotheses_are_unverified_not_causal_rules": true,
+  "reflections": [
+    {
+      "actions": [
+        "adjust_range"
+      ],
+      "conditions": {
+        "environment_key": "6b3093593f5c2200006122346bfcc76724e92a62ca151be81dba8ebf5043c6fa",
+        "objective_key": "tps_per_p95:maximize"
+      },
+      "evidence_ids": [
+        "6c53b53e3d424d058f4530f322e9e563",
+        "610d5f08754a4dbc829f001812c7f90c",
+        "591382fe7df14d09be79f15629c79a0e",
+        "b2c04a2beda74bd99ab70c8c849b11c5",
+        "01a50eb5d8e84dcfb3dfd3ae0877c761",
+        "cc07b8dcb41044f28e54b114e056e4e1",
+        "666ab251f54346378ae450e33d2b73c6"
+      ],
+      "facts": [
+        {
+          "status": "measured",
+          "trial_id": "6c53b53e3d424d058f4530f322e9e563",
+          "value": 134.025711
+        },
+        {
+          "status": "measured",
+          "trial_id": "610d5f08754a4dbc829f001812c7f90c",
+          "value": 47.931029
+        },
+        {
+          "status": "measured",
+          "trial_id": "591382fe7df14d09be79f15629c79a0e",
+          "value": 52.369838
+        },
+        {
+          "status": "measured",
+          "trial_id": "b2c04a2beda74bd99ab70c8c849b11c5",
+          "value": 57.386146
+        },
+        {
+          "status": "measured",
+          "trial_id": "01a50eb5d8e84dcfb3dfd3ae0877c761",
+          "value": 132.224836
+        },
+        {
+          "status": "measured",
+          "trial_id": "cc07b8dcb41044f28e54b114e056e4e1",
+          "value": 48.61924
+        },
+        {
+          "status": "measured",
+          "trial_id": "666ab251f54346378ae450e33d2b73c6",
+          "value": 128.801182
+        }
+      ],
+      "hypotheses": [
+        "High innodb_io_capacity settings (>=400) combined with large buffer pools cause severe throttling (>98%), drastically reducing effective TPS despite high raw throughput potential.",
+        "Low innodb_io_capacity settings (200-1000) with moderate buffer pools avoid throttling and yield stable, higher effective TPS.",
+        "Increasing sort_buffer_size and innodb_io_capacity beyond baseline levels does not improve performance due to I/O saturation and throttling."
+      ]
+    }
+  ]
+}
