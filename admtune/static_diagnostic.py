@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 import shlex
 import statistics
 import time
@@ -105,11 +106,26 @@ def counter_delta(before, after):
 
 class DiagnosticConnector(LocalConnector):
     capture = None
+    fixed_rate = None
 
     def run(self, command, **kwargs):
         tokens = shlex.split(command)
-        measured = bool(tokens and tokens[0] == "sysbench" and "--time=60" in tokens
-                        and tokens[-1] == "run")
+        benchmark = bool(tokens and tokens[0] == "sysbench" and tokens[-1] == "run")
+        measured = benchmark and "--time=60" in tokens
+        if benchmark:
+            if self.fixed_rate is not None:
+                if self.fixed_rate != 1000 or any(t.startswith(("--rate=", "--tx-rate=")) for t in tokens):
+                    raise ValueError("固定速率复验只允许显式1000且不能重复指定速率")
+                tokens.insert(-1, "--rate=1000")
+                command = shlex.join(tokens)
+            # 仅保存可公开的控制参数，绝不保存带数据库密码的完整命令。
+            evidence = {"script": tokens[1], "duration": next(
+                (int(t.split("=", 1)[1]) for t in tokens if t.startswith("--time=")), None),
+                "rate": self.fixed_rate, "rate_flag": next(
+                (t for t in tokens if t.startswith("--rate=")), None)}
+            if not hasattr(self, "command_evidence"):
+                self.command_evidence = []
+            self.command_evidence.append(evidence)
         if not measured or self.capture is None:
             return super().run(command, **kwargs)
         before = self.capture()
@@ -119,6 +135,18 @@ class DiagnosticConnector(LocalConnector):
             after = self.capture()
             self.boundaries = {"before": before, "after": after,
                                "delta": counter_delta(before, after)}
+
+
+def rate_check(log, tps, target=1000):
+    """速率是期望平均事件率，不将60000期望事件数当作固定提交数。"""
+    header = re.search(r"Target transaction rate:\s*(\d+)\s*/sec", log)
+    queues = [int(v) for v in re.findall(r"(?:qlen|queue length):\s*(\d+)", log)]
+    return {"target_tps": target, "expected_events": target*60,
+            "native_header_rate": int(header.group(1)) if header else None,
+            "achieved_fraction": None if tps is None else tps/target,
+            "tolerance_fraction": .05, "max_reported_queue": max(queues) if queues else None,
+            "passed": bool(header and int(header.group(1)) == target and tps is not None
+                           and abs(tps/target-1) <= .05)}
 
 
 def summarize(records):
@@ -140,6 +168,7 @@ def main():
     for key in ("target", "benchmark", "knobs", "output", "restore-audit", "parent-run"):
         parser.add_argument("--"+key, type=Path, required=True)
     parser.add_argument("--dedicated-instance", action="store_true")
+    parser.add_argument("--fixed-rate", type=int, choices=[1000])
     a = parser.parse_args()
     if not a.dedicated_instance:
         parser.error("必须指定专用实例")
@@ -168,6 +197,7 @@ def main():
     space = load_space(a.knobs, memory_bytes=app.target.hardware_memory_bytes)
     connector = DiagnosticConnector(app.target.ssh, config_path=app.target.mysql.config_path,
                                     dbms="mysql", dry_run=False)
+    connector.fixed_rate = a.fixed_rate
     executor = PaperExecutor(app, space, Objective(), a.output, allow_mutations=True,
                              local=True, connector=connector)
     records, result = [], {"completed": False, "llm_calls": 0}
@@ -185,8 +215,11 @@ def main():
             return {"at": time.monotonic(), "cgroup": cgroup_sample(), "process": process_sample(pid),
                     "mysql": status_sample(executor.db)}
         connector.capture = capture
-        write_json(a.output/"manifest.json", {"mode": "zero_llm_static_diagnostic", "plan": plan(),
+        write_json(a.output/"manifest.json", {"mode": "zero_llm_rate_diagnostic" if a.fixed_rate else "zero_llm_static_diagnostic", "plan": plan(),
             "configs": configs, "benchmark": asdict(app.benchmark), "preflight": preflight,
+            "fixed_rate_tps": a.fixed_rate,
+            "rate_policy": {"warmup_and_measurement": True, "achieved_tolerance_fraction": .05,
+                            "expected_events_are_not_exact_arrivals": True} if a.fixed_rate else None,
             "hardware": hardware_context(), "same_cgroup": same_cgroup, "restore": audit,
             "parent_summary_sha256": hashlib.sha256((a.parent_run/"summary.json").read_bytes()).hexdigest(),
             "parent_manifest_sha256": hashlib.sha256((a.parent_run/"manifest.json").read_bytes()).hexdigest(),
@@ -201,13 +234,22 @@ def main():
             folder.mkdir(parents=True, mode=0o700)
             executor.run_dir = folder
             connector.boundaries = None
+            connector.command_evidence = []
             offset = len(executor.resize_checks)
             m = executor.measure(configs[spec["name"]], [0.0])
             boundaries = connector.boundaries
             executor.restore_initial()
             valid = bool(m.status == "measured" and m.complete and m.effective and m.constraints_ok and boundaries)
+            gate = None
+            if a.fixed_rate:
+                raw = folder/m.metadata["benchmark_log"] if m.metadata.get("benchmark_log") else None
+                gate = rate_check(raw.read_text() if raw and raw.exists() else "", m.value, a.fixed_rate)
+                expected_commands = [(15, "--rate=1000"), (60, "--rate=1000")]
+                actual_commands = [(c["duration"], c["rate_flag"]) for c in connector.command_evidence]
+                valid = valid and gate["passed"] and actual_commands == expected_commands
             record = {**spec, "config": configs[spec["name"]], "valid": valid, "measurement": asdict(m),
                       "telemetry": boundaries, "resize_checks": executor.resize_checks[offset:],
+                      "rate_check": gate, "command_evidence": connector.command_evidence,
                       "elapsed_seconds": time.monotonic()-started,
                       "benchmark_log": str(folder.relative_to(a.output)/m.metadata["benchmark_log"]) if m.metadata.get("benchmark_log") else None}
             records.append(record)

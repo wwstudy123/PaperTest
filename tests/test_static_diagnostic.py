@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
 
-from admtune.static_diagnostic import plan, configurations, counter_delta, DiagnosticConnector, summarize
+from admtune.static_diagnostic import plan, configurations, counter_delta, DiagnosticConnector, summarize, rate_check
 
 
 class StaticDiagnosticTests(unittest.TestCase):
@@ -76,3 +76,33 @@ class StaticDiagnosticTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "fixture"):
                 connector.run("sysbench /script --time=60 run")
             self.assertEqual(connector.boundaries["delta"]["mysqld_read_bytes"], 1024)
+
+    def test_rate_flag_reaches_warmup_and_measurement_without_password_evidence(self):
+        connector = object.__new__(DiagnosticConnector)
+        connector.fixed_rate = 1000
+        connector.capture = None
+        with patch("connectors.local_connector.LocalConnector.run", return_value=SimpleNamespace(ok=True)) as run:
+            connector.run("sysbench /script --mysql-password='private fixture' --time=15 run")
+            connector.run("sysbench /script --mysql-password='private fixture' --time=60 run")
+            self.assertTrue(all("--rate=1000" in c.args[0] for c in run.call_args_list))
+            self.assertEqual([c["duration"] for c in connector.command_evidence], [15, 60])
+            self.assertNotIn("private fixture", str(connector.command_evidence))
+
+    def test_rate_rejects_overrides_and_wrong_value(self):
+        connector = object.__new__(DiagnosticConnector)
+        connector.fixed_rate = 1000
+        with self.assertRaises(ValueError):
+            connector.run("sysbench /script --time=60 --rate=900 run")
+        connector.fixed_rate = 800
+        with self.assertRaises(ValueError):
+            connector.run("sysbench /script --time=60 run")
+
+    def test_rate_gate_requires_native_header_and_achieved_load(self):
+        log = "Target transaction rate: 1000/sec\n[ 5s ] qlen: 2\n[ 10s ] qlen: 0"
+        self.assertTrue(rate_check(log, 995)["passed"])
+        self.assertEqual(rate_check(log, 995)["max_reported_queue"], 2)
+        self.assertEqual(rate_check("Target transaction rate: 1000/sec\nqueue length: 3, concurrency: 2",
+                                    1000)["max_reported_queue"], 3)
+        self.assertFalse(rate_check(log, 900)["passed"])
+        self.assertFalse(rate_check("fixture", 1000)["passed"])
+        self.assertFalse(rate_check(log, None)["passed"])
