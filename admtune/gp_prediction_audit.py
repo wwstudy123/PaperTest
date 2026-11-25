@@ -65,6 +65,7 @@ class GPPredictionAudit:
         encoded = self.space.encode(config)+[0.]
         payload = {
             "next_seq": seq, "config": deepcopy(config), "submitted_at_utc": datetime.now(timezone.utc).isoformat(),
+            "environment_key": self.environment_key,
             "submitted_elapsed_seconds": elapsed_seconds,
             "policy": deepcopy(AUDIT_POLICY), "training_sequences": [r["seq"] for r in records],
             "models": {

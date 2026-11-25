@@ -36,6 +36,7 @@ class PredictionAuditTests(unittest.TestCase):
             self.assertEqual(sealed, json.loads((output/"before-000007.json").read_text()))
             self.assertEqual(sealed["training_sequences"], list(range(1, 7)))
             self.assertEqual(sealed["next_seq"], 7)
+            self.assertEqual(sealed["environment_key"], "env")
             self.assertNotIn("actual_objective", sealed)
             self.assertEqual(len(sealed["models"]["legacy"]["snapshot"]["target"]), 6)
             self.assertEqual(len(sealed["models"]["repeat_aware"]["snapshot"]["gp"]["target"]), 6)

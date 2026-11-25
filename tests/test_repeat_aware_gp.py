@@ -64,7 +64,9 @@ class FixedTrainingNoiseTests(unittest.TestCase):
             expected = next(r for r in csv.DictReader(f) if r["name"] == "Default")
         model = GaussianProcess.from_snapshot(saved)
         prediction = model.predict([saved["x"][0]])[0]
-        self.assertAlmostEqual(math.exp(prediction.mean), float(expected["predicted_objective"]), places=10)
+        # 同一旧快照在macOS/Linux的线性代数后端上可能有极小舍入差异。
+        self.assertTrue(math.isclose(math.exp(prediction.mean), float(expected["predicted_objective"]),
+                                     rel_tol=1e-10, abs_tol=1e-9))
         self.assertAlmostEqual(prediction.observation_std, float(expected["observation_log_std"]), places=12)
 
     def test_new_snapshot_roundtrip_and_noise_tamper_rejection(self):
