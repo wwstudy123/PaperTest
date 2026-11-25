@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
 import hashlib
@@ -39,6 +40,28 @@ POLICY = {"protocol_version": 1, "objective": OBJECTIVE, "label_precision_decima
           "max_refresh_total": 2, "refresh_per_decision": 1, "incumbent_repeat": False,
           "final_reflection_call_reserve": 1, "final_reflection_token_reserve": 10000,
           "final_reflection_seconds_reserve": 30}
+
+
+def runtime_policy(gp_policy="legacy", initial_noise_repeats=0):
+    if gp_policy not in {"legacy", "repeat-aware"} or isinstance(initial_noise_repeats, bool) or initial_noise_repeats not in {0, 3}:
+        raise ValueError("Unknown GP policy or initial noise calibration schedule")
+    policy = deepcopy(POLICY)
+    if gp_policy == "legacy" and initial_noise_repeats == 0:
+        return policy
+    from .repeat_aware_gp import POLICY as REPEAT_POLICY
+    return {**policy, "protocol_version": 2, "gp_policy": gp_policy,
+            "gp_training": deepcopy(REPEAT_POLICY) if gp_policy == "repeat-aware" else "legacy_every_10",
+            "initial_noise_repeats": initial_noise_repeats,
+            "calibration_promotes_incumbent": False,
+            "baseline_anchor": "first_initial_measurement_not_maximum_repeat"}
+
+
+def pilot_limits(initial_noise_repeats=0):
+    runtime_policy("legacy", initial_noise_repeats)
+    return (Limits(trials=10, wall_seconds=1500, llm_calls=6, llm_tokens=24000,
+                   recovery_reserve_seconds=60) if initial_noise_repeats else
+            Limits(trials=8, wall_seconds=1200, llm_calls=8, llm_tokens=32000,
+                   recovery_reserve_seconds=60))
 
 
 class SearchStopped(RuntimeError):
@@ -147,7 +170,8 @@ class CompositeLedger(DurableLedger):
 class CompositeRun(TimedRun):
     objective_key = OBJECTIVE
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, gp_policy="legacy", initial_noise_repeats=0, **kwargs):
+        runtime_policy(gp_policy, initial_noise_repeats)
         super().__init__(*args, **kwargs)
         old = self.state.get("objective_key")
         if old not in {None, OBJECTIVE} or any(
@@ -157,6 +181,44 @@ class CompositeRun(TimedRun):
         self.state["objective_key"] = OBJECTIVE
         self.state.setdefault("refresh_count", 0)
         self.state.setdefault("retired_by_model", {})
+        bound = self.journal.count > 0 or "gp_policy" in self.state or self.state.get("gp") is not None
+        if bound and (self.state.get("gp_policy", "legacy") != gp_policy
+                or self.state.get("initial_noise_repeats", 0) != initial_noise_repeats):
+            raise ValueError("Do not change GP or calibration policy in an existing journal")
+        self.gp_policy, self.initial_noise_repeats = gp_policy, initial_noise_repeats
+        self.state.update(gp_policy=gp_policy, initial_noise_repeats=initial_noise_repeats)
+        self.repeat_gp = None
+        if gp_policy == "repeat-aware":
+            from .repeat_aware_gp import RepeatAwareGP
+            saved = self.state.get("repeat_gp")
+            if self.state.get("gp") and not saved:
+                raise ValueError("Repeat-aware GP requires matching repeat provenance")
+            self.repeat_gp = (RepeatAwareGP.from_snapshot(self.space, saved) if saved
+                              else RepeatAwareGP(self.space))
+            self.gp = self.repeat_gp.model
+
+    def fit(self):
+        if self.gp_policy == "legacy":
+            return super().fit()
+        history = [t for t in self.store.trials() if t.trainable and t.constraints_ok]
+        if any(t.objective_key != OBJECTIVE or t.environment_key != self.environment.key for t in history):
+            raise ValueError("Refuse mixed objective/environment GP labels")
+        if len(history) < 6 or not self.repeat_gp.update(history):
+            return
+        self.gp = self.repeat_gp.model
+        self.state["repeat_gp"] = self.repeat_gp.snapshot()
+        self.save_gp_snapshot(self.gp.snapshot([t.trial_id for t in history]))
+
+    def step(self):
+        record = super().step()
+        if record.metadata["kind"] == "noise_calibration" and not (
+                record.trainable and record.constraints_ok):
+            raise RuntimeError("Invalid predeclared calibration observation; stop without budget filling")
+        return record
+
+    def checkpoint_reflection_allowed(self):
+        # 10号最终复测不能提前消费新增证据或占用为阶段结束反思保留的调用。
+        return not self.finalizing
 
     def experiences(self):
         records = [t for t in self.store.trials() if t.trainable and t.constraints_ok][-3:]
@@ -195,6 +257,11 @@ class CompositeRun(TimedRun):
         self.journal.put("state", self.save_state())
 
     def choose(self, seq):
+        if not self.finalizing and 2 <= seq <= self.initial_noise_repeats+1:
+            if self.state["baseline"] is None:
+                raise ValueError("Valid initial baseline required before noise calibration")
+            return "noise_calibration", self.state["initial"], {
+                "rule": "predeclared_initial_noise_calibration", "ordinal": seq-1}
         decision = super().choose(seq)
         if decision[0] != "incumbent_repeat":
             return decision
@@ -280,6 +347,8 @@ class CompositeRun(TimedRun):
             "SELECT COUNT(*) FROM events WHERE kind='prescreen_refused'").fetchone()[0]
         return {"status": "completed" if final_value is not None else "incomplete",
                 "objective": OBJECTIVE, "label_precision_decimals": 6,
+                "gp_policy": self.gp_policy, "initial_noise_repeats": self.initial_noise_repeats,
+                "repeat_noise_audit": self.repeat_gp.audit if self.repeat_gp else None,
                 "stop_reason": stop, "completed_trials": self.journal.count,
                 "baseline_value": self.state["baseline"], "search_value": self.state["best_value"],
                 "final_verification_value": final_value, "incumbent": self.state["incumbent"],
@@ -300,6 +369,8 @@ def main():
         parser.add_argument("--"+key, type=Path, required=True)
     parser.add_argument("--dedicated-instance", action="store_true")
     parser.add_argument("--allow-paid-llm", action="store_true")
+    parser.add_argument("--gp-policy", choices=["legacy", "repeat-aware"], default="legacy")
+    parser.add_argument("--initial-noise-repeats", type=int, choices=[0, 3], default=0)
     a = parser.parse_args()
     if not a.dedicated_instance or not a.allow_paid_llm:
         parser.error("需要专用实例和付费LLM显式授权")
@@ -324,7 +395,8 @@ def main():
     executor = CompositeExecutor(raw)
     journal = ledger = client = None
     result = {"status": "failed", "objective": OBJECTIVE}
-    limits = Limits(trials=8, wall_seconds=1200, llm_calls=8, llm_tokens=32000, recovery_reserve_seconds=60)
+    limits = pilot_limits(a.initial_noise_repeats)
+    policy = runtime_policy(a.gp_policy, a.initial_noise_repeats)
     try:
         if connector.run("pgrep -x sysbench", check=False).ok:
             raise ValueError("已有Sysbench进程，拒绝并行测量或配置修改")
@@ -344,10 +416,10 @@ def main():
         environment = Environment("mysql", preflight["db_version"], socket.gethostname(), extra["data_id"],
             preflight["readiness"]["live_schema_hash"], fingerprint({
                 "benchmark": asdict(app.benchmark), "space": space.describe(),
-                "initial": preflight["current_config"], "policy": POLICY, "limits": asdict(limits)}))
+                "initial": preflight["current_config"], "policy": policy, "limits": asdict(limits)}))
         atomic_json(a.output/"manifest.json", {
             "method": "ADMTune-composite-pilot", "simulated": False, "objective": OBJECTIVE,
-            "policy": POLICY, "limits": asdict(limits), "benchmark": asdict(app.benchmark),
+            "policy": policy, "limits": asdict(limits), "benchmark": asdict(app.benchmark),
             "space": space.describe(), "preflight": preflight, "restore": audit,
             "environment": asdict(environment), "hardware": hardware_context(),
             "code_sha256": code_hash(root), "model": os.getenv("OPENAI_MODEL"),
@@ -360,7 +432,8 @@ def main():
         client = LLMClient.from_env(dry_run=False); client.allow_fallback = False
         backend = EvidenceWireBackend(AgenticDBBackend(client, ledger, trace_dir=a.output/"llm_calls"),
                                       audit_dir=a.output/"evidence")
-        result = CompositeRun(journal, executor, space, environment, a.output, backend, ledger).run_pilot()
+        result = CompositeRun(journal, executor, space, environment, a.output, backend, ledger,
+                              gp_policy=a.gp_policy, initial_noise_repeats=a.initial_noise_repeats).run_pilot()
     except Exception as exc:
         result.update(status="failed", error=redact(str(exc)))
     finally:

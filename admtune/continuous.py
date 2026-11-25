@@ -212,7 +212,9 @@ class ContinuousRun:
             return
         self.gp.fit([self.space.encode(t.config) + t.context for t in history],
                     [math.log(t.value) for t in history], optimize=self.gp.version % 10 == 0)
-        payload = self.gp.snapshot(ids)
+        self.save_gp_snapshot(self.gp.snapshot(ids))
+
+    def save_gp_snapshot(self, payload):
         folder = self.output / "gp_snapshots"
         folder.mkdir(exist_ok=True)
         path = folder / f"gp-{self.gp.version:04d}-{fingerprint(payload)[:12]}.json"
@@ -333,13 +335,16 @@ class ContinuousRun:
         recent = self.store.trials()[-3:]
         if len(recent) == 3 and all(not (t.trainable and t.constraints_ok) for t in recent):
             raise RuntimeError("Three consecutive invalid attempts; stop for diagnosis, not budget filling")
-        if seq % 10 == 0:
+        if seq % 10 == 0 and self.checkpoint_reflection_allowed():
             try:
                 self.reflector.trigger(["checkpoint"], force=True)
             except (RuntimeError, ValueError) as exc:
                 self.store.event("reflection_deferred", {"at_seq": seq, "reason": redact(str(exc))})
         self.export()
         return record
+
+    def checkpoint_reflection_allowed(self):
+        return True
 
     def export(self):
         self.journal.audit()
