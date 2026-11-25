@@ -6,6 +6,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import shlex
@@ -27,12 +28,51 @@ from .security import redact
 
 
 NAMES = ("Default", "BufferOnly", "ADMTuneConfig")
+CONCURRENCY_NAMES = ("Default", "BufferOnly", "Concurrency8")
+CONCURRENCY_VARIABLES = ("innodb_thread_concurrency", "innodb_thread_sleep_delay",
+                         "innodb_adaptive_max_sleep_delay", "innodb_concurrency_tickets")
 
 
-def plan():
+def plan(names=NAMES):
     # 各配置在每个区组、每个位置各出现一次；不是随机排列。
-    return [{"seq": 3*b+i+1, "block": b+1, "position": i+1, "name": NAMES[(b+i) % 3]}
+    if len(names) != 3 or len(set(names)) != 3:
+        raise ValueError("三个唯一配置名才适用于本平衡协议")
+    return [{"seq": 3*b+i+1, "block": b+1, "position": i+1, "name": names[(b+i) % 3]}
             for b in range(3) for i in range(3)]
+
+
+def joint_utility(tps, p95_ms):
+    if any(isinstance(v, bool) or not isinstance(v, (int, float)) or
+           not math.isfinite(v) or v <= 0 for v in (tps, p95_ms)):
+        raise ValueError("TPS/P95必须来自同次有效观测且分子分母有限、为正")
+    return tps/p95_ms
+
+
+def concurrency_configurations(initial, chosen, space):
+    expected = {"innodb_buffer_pool_size": 1024**3, "innodb_io_capacity": 200,
+                "innodb_io_capacity_max": 2000, "sort_buffer_size": 262144,
+                "innodb_thread_concurrency": 0}
+    if initial != expected or chosen != {**{k: v for k, v in expected.items()
+                                           if k != "innodb_thread_concurrency"},
+                                         "innodb_buffer_pool_size": 4*1024**3,
+                                         "innodb_io_capacity": 1200, "innodb_io_capacity_max": 4500}:
+        raise ValueError("并发探针要求冻结的初始配置、0并发限制及原运行父配置")
+    buffer = space.merge(initial, {"innodb_buffer_pool_size": 4*1024**3})
+    limited = space.merge(buffer, {"innodb_thread_concurrency": 8})
+    return dict(zip(CONCURRENCY_NAMES, [dict(initial), buffer, limited]))
+
+
+def restore_concurrency_context(db, initial):
+    if set(initial) != set(CONCURRENCY_VARIABLES) or initial["innodb_thread_concurrency"] != 0:
+        raise ValueError("并发上下文恢复目标不完整或并非初始0并发限制")
+    current = {k: int(v) for k, v in db.show_variables(list(CONCURRENCY_VARIABLES)).items()}
+    if current.get("innodb_thread_concurrency") != 0:
+        raise ValueError("须先恢复完整配置及0并发限制")
+    for name in CONCURRENCY_VARIABLES[1:]:
+        if current.get(name) != initial[name]:
+            db.execute(f"SET GLOBAL {name} = {int(initial[name])};")
+    if {k: int(v) for k, v in db.show_variables(list(CONCURRENCY_VARIABLES)).items()} != initial:
+        raise ValueError("并发自适应上下文恢复失败")
 
 
 def configurations(initial, chosen, space):
@@ -149,9 +189,9 @@ def rate_check(log, tps, target=1000):
                            and abs(tps/target-1) <= .05)}
 
 
-def summarize(records):
+def summarize(records, names=NAMES):
     rows = []
-    for name in NAMES:
+    for name in names:
         data = [r for r in records if r["name"] == name and r["valid"]]
         rows.append({"name": name, "n": len(data),
                      "median_tps": statistics.median(r["measurement"]["value"] for r in data) if data else None,
@@ -160,6 +200,9 @@ def summarize(records):
                          r["telemetry"]["delta"]["throttled_period_fraction"] for r in data
                          if r["telemetry"]["delta"]["throttled_period_fraction"] is not None) if
                      any(r["telemetry"]["delta"]["throttled_period_fraction"] is not None for r in data) else None})
+        if any("joint_value" in r for r in records):
+            values = [r["joint_value"] for r in data if r.get("joint_value") is not None]
+            rows[-1]["median_joint_value"] = statistics.median(values) if values else None
     return rows
 
 
@@ -168,7 +211,9 @@ def main():
     for key in ("target", "benchmark", "knobs", "output", "restore-audit", "parent-run"):
         parser.add_argument("--"+key, type=Path, required=True)
     parser.add_argument("--dedicated-instance", action="store_true")
-    parser.add_argument("--fixed-rate", type=int, choices=[1000])
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--fixed-rate", type=int, choices=[1000])
+    mode.add_argument("--concurrency-probe", action="store_true")
     a = parser.parse_args()
     if not a.dedicated_instance:
         parser.error("必须指定专用实例")
@@ -201,22 +246,38 @@ def main():
     executor = PaperExecutor(app, space, Objective(), a.output, allow_mutations=True,
                              local=True, connector=connector)
     records, result = [], {"completed": False, "llm_calls": 0}
+    concurrency_initial = None
     started = time.monotonic()
     try:
         preflight = executor.preflight()
         if preflight["config_sha256"] != audit["config_sha256"]:
             raise ValueError("初始配置与冷恢复不一致")
-        configs = configurations(preflight["current_config"], parent["incumbent"], space)
+        case_names = CONCURRENCY_NAMES if a.concurrency_probe else NAMES
+        configs = (concurrency_configurations if a.concurrency_probe else configurations)(
+            preflight["current_config"], parent["incumbent"], space)
+        if a.concurrency_probe:
+            concurrency_initial = {k: int(v) for k, v in
+                                   executor.db.show_variables(list(CONCURRENCY_VARIABLES)).items()}
+            restore_concurrency_context(executor.db, concurrency_initial)
         pid = int(Path(app.target.mysql.pid_file).read_text())
         same_cgroup = (Path(f"/proc/{pid}/cgroup").read_text() == Path("/proc/self/cgroup").read_text())
         if not same_cgroup:
             raise ValueError("MySQL与采样进程不在同一cgroup，拒绝错误归因")
         def capture():
-            return {"at": time.monotonic(), "cgroup": cgroup_sample(), "process": process_sample(pid),
-                    "mysql": status_sample(executor.db)}
+            result = {"at": time.monotonic(), "cgroup": cgroup_sample(), "process": process_sample(pid),
+                      "mysql": status_sample(executor.db)}
+            if a.concurrency_probe:
+                result["concurrency_variables"] = executor.db.show_variables(list(CONCURRENCY_VARIABLES))
+            return result
         connector.capture = capture
-        write_json(a.output/"manifest.json", {"mode": "zero_llm_rate_diagnostic" if a.fixed_rate else "zero_llm_static_diagnostic", "plan": plan(),
+        write_json(a.output/"manifest.json", {"mode": "zero_llm_concurrency_probe" if a.concurrency_probe else
+                    ("zero_llm_rate_diagnostic" if a.fixed_rate else "zero_llm_static_diagnostic"),
+            "plan": plan(case_names), "case_names": case_names,
             "configs": configs, "benchmark": asdict(app.benchmark), "preflight": preflight,
+            "evaluation_objective": "tps_per_p95:maximize" if a.concurrency_probe else "tps:maximize",
+            "raw_measurement_objective": "tps:maximize",
+            "space": space.describe(),
+            "concurrency_initial": concurrency_initial,
             "fixed_rate_tps": a.fixed_rate,
             "rate_policy": {"warmup_and_measurement": True, "achieved_tolerance_fraction": .05,
                             "expected_events_are_not_exact_arrivals": True} if a.fixed_rate else None,
@@ -226,10 +287,12 @@ def main():
             "telemetry_scope": "60-second measured command boundaries; excludes 15-second warmup; includes small sampling overhead",
             "cache_protocol": "one initial cold restore; restore Default before/after each trial; balanced Latin blocks; no per-trial cold restore",
             "created_at_utc": datetime.now(timezone.utc).isoformat(), **source_provenance()})
-        for spec in plan():
+        for spec in plan(case_names):
             if time.monotonic()-started > 1500:
                 raise TimeoutError("诊断预算1500秒已到，不再提交测量")
             executor.restore_initial()
+            if concurrency_initial:
+                restore_concurrency_context(executor.db, concurrency_initial)
             folder = a.output/"trials"/f"{spec['seq']:06d}"
             folder.mkdir(parents=True, mode=0o700)
             executor.run_dir = folder
@@ -239,6 +302,8 @@ def main():
             m = executor.measure(configs[spec["name"]], [0.0])
             boundaries = connector.boundaries
             executor.restore_initial()
+            if concurrency_initial:
+                restore_concurrency_context(executor.db, concurrency_initial)
             valid = bool(m.status == "measured" and m.complete and m.effective and m.constraints_ok and boundaries)
             gate = None
             if a.fixed_rate:
@@ -252,18 +317,22 @@ def main():
                       "rate_check": gate, "command_evidence": connector.command_evidence,
                       "elapsed_seconds": time.monotonic()-started,
                       "benchmark_log": str(folder.relative_to(a.output)/m.metadata["benchmark_log"]) if m.metadata.get("benchmark_log") else None}
+            if a.concurrency_probe:
+                record["joint_value"] = joint_utility(m.value, m.metadata.get("p95_latency_ms")) if valid else None
             records.append(record)
             with (a.output/"trials.jsonl").open("a") as f:
                 f.write(json.dumps(record, allow_nan=False)+"\n")
             write_json(a.output/"progress.json", {"completed_trials": len(records), "last": record})
             if not valid:
                 raise ValueError("无效观测，停止诊断，不补造成功记录")
-        result.update(completed=True, aggregates=summarize(records))
+        result.update(completed=True, aggregates=summarize(records, case_names))
     except Exception as exc:
         result["error"] = redact(str(exc))
     finally:
         try:
             executor.restore_initial()
+            if concurrency_initial:
+                restore_concurrency_context(executor.db, concurrency_initial)
             result["initial_configuration_restored"] = executor.initial is not None
         except Exception as exc:
             result.update(completed=False, recovery_error=redact(str(exc)))
@@ -273,8 +342,9 @@ def main():
         write_csv(a.output/"metrics.csv", [
             {**{k: r[k] for k in ("seq", "block", "position", "name", "valid")},
              "tps": r["measurement"]["value"], "p95_ms": r["measurement"]["metadata"].get("p95_latency_ms"),
+             "joint_value": r.get("joint_value"),
              **({k: v for k, v in r["telemetry"]["delta"].items() if k != "mysql"} if r["telemetry"] else {})}
-            for r in records], ["seq", "block", "position", "name", "valid", "tps", "p95_ms",
+            for r in records], ["seq", "block", "position", "name", "valid", "tps", "p95_ms", "joint_value",
                                "boundary_elapsed_seconds", "mysqld_cpu_cores", "mysqld_read_bytes", "mysqld_write_bytes",
                                "cgroup_cpu_cores", "nr_periods", "nr_throttled", "throttled_period_fraction", "throttled_seconds"])
         write_json(a.output/"checksums.json", {

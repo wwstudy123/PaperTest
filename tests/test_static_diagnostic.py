@@ -2,7 +2,9 @@ import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
 
-from admtune.static_diagnostic import plan, configurations, counter_delta, DiagnosticConnector, summarize, rate_check
+from admtune.static_diagnostic import (plan, configurations, counter_delta, DiagnosticConnector,
+                                     summarize, rate_check, concurrency_configurations,
+                                     CONCURRENCY_NAMES, joint_utility, restore_concurrency_context)
 
 
 class StaticDiagnosticTests(unittest.TestCase):
@@ -106,3 +108,42 @@ class StaticDiagnosticTests(unittest.TestCase):
         self.assertFalse(rate_check(log, 900)["passed"])
         self.assertFalse(rate_check("fixture", 1000)["passed"])
         self.assertFalse(rate_check(log, None)["passed"])
+
+    def test_composite_is_same_measurement_ratio_and_rejects_bad_values(self):
+        self.assertEqual(joint_utility(2000, 20), 100)
+        for bad in (0, -1, None, float("nan"), float("inf"), True, "bad"):
+            with self.assertRaises(ValueError):
+                joint_utility(2000, bad)
+        self.assertLess(joint_utility(3807.49, 68.05), joint_utility(2449.19, 18.28))
+
+    def test_concurrency_probe_isolates_db_knob(self):
+        initial = dict(innodb_buffer_pool_size=1024**3, innodb_io_capacity=200,
+                       innodb_io_capacity_max=2000, sort_buffer_size=262144, innodb_thread_concurrency=0)
+        chosen = {k: v for k, v in initial.items() if k != "innodb_thread_concurrency"}
+        chosen.update(innodb_buffer_pool_size=4*1024**3, innodb_io_capacity=1200,
+                      innodb_io_capacity_max=4500)
+        space = SimpleNamespace(merge=lambda base, delta: {**base, **delta})
+        configs = concurrency_configurations(initial, chosen, space)
+        self.assertEqual([k for k in initial if configs["BufferOnly"][k] != configs["Concurrency8"][k]],
+                         ["innodb_thread_concurrency"])
+        self.assertEqual(configs["Concurrency8"]["innodb_thread_concurrency"], 8)
+        rows = plan(CONCURRENCY_NAMES)
+        for field in ("block", "position"):
+            for i in range(1, 4):
+                self.assertEqual({r["name"] for r in rows if r[field] == i}, set(CONCURRENCY_NAMES))
+        with self.assertRaises(ValueError):
+            concurrency_configurations({**initial, "innodb_thread_concurrency": 4}, chosen, space)
+
+    def test_adaptive_sleep_is_restored_not_silently_carried_to_next_trial(self):
+        initial = dict(innodb_thread_concurrency=0, innodb_thread_sleep_delay=10000,
+                       innodb_adaptive_max_sleep_delay=150000, innodb_concurrency_tickets=5000)
+        state = {**initial, "innodb_thread_sleep_delay": 12345}
+        def execute(sql):
+            name, value = sql.removeprefix("SET GLOBAL ").removesuffix(";").split(" = ")
+            state[name] = int(value)
+        db = SimpleNamespace(show_variables=lambda names: dict(state), execute=execute)
+        restore_concurrency_context(db, initial)
+        self.assertEqual(state, initial)
+        state["innodb_thread_concurrency"] = 8
+        with self.assertRaises(ValueError):
+            restore_concurrency_context(db, initial)
