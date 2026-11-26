@@ -63,6 +63,16 @@ class AgenticDBStrategy:
         self.skill = (Path(__file__).resolve().parents[1]/"skills/agenticdb_skill.md").read_text()
 
     def propose(self, records, incumbent):
+        for attempt in range(2):
+            try:
+                return self._propose(records, incumbent)
+            except (ValueError, KeyError, TypeError) as exc:
+                self.validation_feedback = str(exc)
+                self.event("agenticdb_format_rejected", {"reason": str(exc), "attempt": attempt+1})
+                if attempt:
+                    raise
+
+    def _propose(self, records, incumbent):
         best = self.best_record or records[0]
         decision = self.auditor.audit(rounds=self.rounds, current_phase="db",
                                       best_result=benchmark_result(best))
@@ -77,6 +87,9 @@ class AgenticDBStrategy:
             "current_config": incumbent, "physical_execution": "restored initial before/after each trial",
             "history": self.rounds[-12:], "latest_observation": context_record(records[-1]),
             "auditor": decision.to_dict(),
+            "validation_feedback": getattr(self, "validation_feedback", None),
+            "numeric_grid_rule": "普通数值必须等于lower+n*step（n为非负整数），特殊值仅取special。"
+                                 "如lower=2000,step=500，2400不合法，2500合法。",
             "candidate_count": len(self.space.names),
             "global_plan_note": "目录少于8项，只能从该目录做全局组合并说明限制。",
         }, prompt, temperature=.2)
@@ -95,6 +108,7 @@ class AgenticDBStrategy:
                 raise ValueError("Unchanged db_config must explicitly request repeat_benchmark")
             kind = "candidate"
         self.pending_proposal = proposal.to_dict()
+        self.validation_feedback = None
         return cfg, kind, {"rule": "agenticdb_global_planner", "proposal": self.pending_proposal}
 
     def observe(self, record):

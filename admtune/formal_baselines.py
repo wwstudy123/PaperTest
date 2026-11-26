@@ -119,6 +119,16 @@ class BaselineRun:
         self.state = {"method": method, "incumbent": executor.readback(), "baseline": None, "best_value": None}
         self.best_record = None
         self.invalid_streak = 0
+        if journal.count:
+            self.state = journal.get("state")
+            if self.state["method"] != method:
+                raise ValueError("Cannot resume another method")
+            for t in journal.store.trials():
+                if t.metadata["kind"] == "baseline" or t.metadata.get("accepted"):
+                    self.best_record = t.to_dict()
+            if strategy and method == "AgenticDB":
+                strategy.rounds = self.state.get("strategy", {}).get("rounds", [])
+                strategy.best_record = self.best_record
 
     def step(self, config, kind, decision):
         if self.j.count >= self.ledger.limits.trials:
@@ -189,7 +199,8 @@ class BaselineRun:
 
     def run(self):
         stop, error = "trial_cap", None
-        self.step(self.state["incumbent"], "baseline", {"rule": "common_baseline"})
+        if self.j.count == 0:
+            self.step(self.state["incumbent"], "baseline", {"rule": "common_baseline"})
         try:
             if self.method == "Default":
                 self.step(self.state["incumbent"], "default_repeat", {"rule": "three_default_measurements"})
@@ -229,6 +240,7 @@ def main():
     parser.add_argument("--repeat", type=int, default=0)
     parser.add_argument("--dedicated-instance", action="store_true")
     parser.add_argument("--allow-paid-llm", action="store_true")
+    parser.add_argument("--resume", action="store_true", help="续接失败基线；保留所有已消耗测量/API/时间")
     a = parser.parse_args()
     if not a.dedicated_instance or (a.method != "Default" and not a.allow_paid_llm):
         parser.error("Explicit dedicated instance and paid-LLM authorization required")
@@ -247,7 +259,16 @@ def main():
     if app.target.dbms != "mysql" or app.target.mysql.host not in {"localhost","127.0.0.1"}:
         parser.error("Local dedicated MySQL required")
     lock = instance_lock(app.target.mysql.config_path)
-    a.output.mkdir(mode=0o700, parents=True, exist_ok=False)
+    if a.resume:
+        old = json.loads((a.output/"summary.json").read_text())
+        if a.method != "AgenticDB" or old["status"] != "failed" or old["method"] != a.method:
+            parser.error("Only failed AgenticDB validation run can be continued")
+        atomic_json(a.output/"summary-before-continuation.json", old)
+        if (a.output/"llm_usage.json").exists():
+            atomic_json(a.output/"llm_usage-before-continuation.json",
+                        json.loads((a.output/"llm_usage.json").read_text()))
+    else:
+        a.output.mkdir(mode=0o700, parents=True, exist_ok=False)
     space = load_space(a.knobs, memory_bytes=app.target.hardware_memory_bytes)
     connector = DiagnosticConnector(app.target.ssh, config_path=app.target.mysql.config_path, dbms="mysql", dry_run=False)
     raw = PaperExecutor(app, space, Objective(),
@@ -273,7 +294,8 @@ def main():
                 "common_policy": POLICY, "method": a.method, "repeat": a.repeat,
                 "space": space.describe(), "benchmark": asdict(app.benchmark),
                 "initial": pre["current_config"], "logical_checksums": reset["logical_checksums"]}))
-        atomic_json(a.output/"manifest.json", {
+        manifest_path = a.output/("continuation-manifest.json" if a.resume else "manifest.json")
+        atomic_json(manifest_path, {
             "method": a.method, "display_method": "AgenticDB (DB-only)" if a.method=="AgenticDB" else a.method,
             "objective": OBJECTIVE, "comparison_protocol": POLICY, "limits": asdict(limits),
             "repeat": a.repeat, "provider_seed_controlled": False, "simulated": False,
@@ -300,6 +322,8 @@ def main():
                 llm = BaselineLLM(client, ledger, a.output/"llm_calls")
                 cls = AgenticDBStrategy if a.method=="AgenticDB" else AgentTuneStrategy
                 strategy = cls(space, llm, workload_features(app, pre), j.store.event)
+                if a.resume:
+                    strategy.validation_feedback = old.get("error")
             result = BaselineRun(a.method, j, executor, space, env, a.output, ledger, strategy).run()
     except Exception as exc:
         result.update(status="failed", error=redact(str(exc)))

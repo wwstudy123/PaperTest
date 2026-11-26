@@ -97,6 +97,17 @@ class FormalBaselineTests(unittest.TestCase):
         self.assertTrue(AgentTuneStrategy(s, None, {}, None).accepts(after, before))
         self.assertFalse(AgenticDBStrategy(s, None, {}, None).accepts(after, before))
 
+    def test_agenticdb_format_feedback_retry_is_real_and_bounded(self):
+        s = space(); llm = Mock()
+        llm.complete.side_effect = [
+            {"action_type": "db_config", "candidate_config": {"innodb_io_capacity_max": 2400}},
+            {"action_type": "db_config", "candidate_config": {"innodb_io_capacity_max": 2500}}]
+        strategy = AgenticDBStrategy(s, llm, {}, lambda *a: None)
+        cfg, _, _ = strategy.propose([record(s)], s.defaults)
+        self.assertEqual(cfg["innodb_io_capacity_max"], 2500)
+        self.assertEqual(llm.complete.call_count, 2)
+        self.assertIn("not aligned", llm.complete.call_args.args[1]["validation_feedback"])
+
     def test_agenticdb_requires_explicit_db_action_and_preserves_plan_feedback(self):
         s = space(); llm = Mock()
         strategy = AgenticDBStrategy(s, llm, {}, lambda *a: None)
@@ -144,6 +155,25 @@ class FormalBaselineTests(unittest.TestCase):
             self.assertNotEqual(j.store.trials()[0].metadata["raw_tps"], j.store.trials()[0].value)
             with self.assertRaises(BudgetExhausted):
                 r.step(s.defaults, "candidate", {})
+            j.store.close()
+
+    def test_continuation_keeps_consumed_slots_and_llm_usage(self):
+        s = space(); strategy = Mock()
+        strategy.rounds = []; strategy.snapshot.return_value = {"rounds": []}
+        strategy.propose.return_value = ({**s.defaults, "innodb_io_capacity": 300}, "candidate", {})
+        strategy.accepts.return_value = False
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); j, r = self.make_runner(root, "AgenticDB", strategy)
+            r.step(s.defaults, "baseline", {})
+            r.ledger.reserve_llm(100); r.ledger.settle_llm(100, 11)
+            r.step(s.defaults, "verification", {})
+            next_ledger = FinalLedger(j, r.ledger.limits, 0)
+            resumed = BaselineRun("AgenticDB", j, r.executor, s, r.env, root, next_ledger, strategy)
+            out = resumed.run()
+            self.assertEqual(j.count, 8); self.assertEqual(out["valid_candidate_measurements"], 5)
+            self.assertEqual(out["budget"]["llm_calls"], 1)
+            self.assertEqual(out["budget"]["llm_tokens_or_reserved"], 11)
+            self.assertEqual(sum(t.metadata["kind"] == "baseline" for t in j.store.trials()), 1)
             j.store.close()
 
     def test_baseline_llm_no_cache_and_usage_charged_on_failure(self):
