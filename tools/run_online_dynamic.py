@@ -15,6 +15,7 @@ def main():
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--dedicated-instance", action="store_true")
     p.add_argument("--allow-paid-llm", action="store_true")
+    p.add_argument("--warm-recheck-source", type=Path)
     a = p.parse_args()
     if not a.dedicated_instance or not a.allow_paid_llm:
         p.error("Explicit dedicated database and paid-LLM authorization required")
@@ -45,9 +46,13 @@ def main():
     stream = ["--phase-seconds", 600, "--query-profile", "range-mixed",
               "--range-rows", 32768, "--top-k", 8192]
     try:
-        reset("calibration-reset")
+        # 暖态修订不再次冷启动；原冷态失败完整保留。正式两方法仍各自独立冷启动并共同预热。
+        if not a.warm_recheck_source:
+            reset("calibration-reset")
         run("admtune.online_dynamic_calibration", [*common, "--benchmark", benchmark,
-            "--knobs", knobs, "--output", a.output/"calibration"], "calibration")
+            "--knobs", knobs, "--output", a.output/"calibration"]+(
+                ["--warm-recheck-source", a.warm_recheck_source] if a.warm_recheck_source else []),
+            "calibration")
         reset("calibration-postcheck", True)
         calibration = json.loads((a.output/"calibration/summary.json").read_text())["result"]
         state["calibration"] = calibration; save()
@@ -55,10 +60,20 @@ def main():
             state.update(status="signal_gate_not_passed", paid_llm_started=False)
         else:
             reset("Default-reset")
+            if a.warm_recheck_source:
+                run("admtune.replay", [*common, "--scenario", "steady", "--phase-seconds", 60,
+                    "--query-profile", "range-mixed", "--table-size", 2000000,
+                    "--range-rows", 32768, "--top-k", 8192,
+                    "--output", a.output/"Default-warmup"], "Default-warmup")
             run("admtune.replay", [*common, *stream, "--scenario", "composition",
                 "--table-size", 2000000, "--output", a.output/"Default"], "Default")
             reset("Default-postcheck", True)
             reset("ADMTune-reset")
+            if a.warm_recheck_source:
+                run("admtune.replay", [*common, "--scenario", "steady", "--phase-seconds", 60,
+                    "--query-profile", "range-mixed", "--table-size", 2000000,
+                    "--range-rows", 32768, "--top-k", 8192,
+                    "--output", a.output/"ADMTune-warmup"], "ADMTune-warmup")
             state["paid_llm_started"] = True; save()
             run("admtune.dynamic", [*common, *stream, "--benchmark", benchmark, "--knobs", knobs,
                 "--backend", "llm", "--allow-paid-llm", "--warmup-seconds", 15,

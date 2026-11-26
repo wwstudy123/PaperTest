@@ -15,6 +15,10 @@ from .dynamic import instance_lock
 from .live import load_space
 from .provenance import source_provenance
 from .real_execution import AgenticDBExecutor
+from .dynamic_runtime import GenerationalRequests
+from .replay import ReplayPlan, replay
+from .replay_report import read_jsonl
+from .contracts import fingerprint
 from .security import redact
 
 
@@ -60,6 +64,8 @@ def main():
     for name in ("target", "benchmark", "knobs", "output"):
         p.add_argument("--"+name, type=Path, required=True)
     p.add_argument("--dedicated-instance", action="store_true")
+    p.add_argument("--warm-recheck-source", type=Path,
+                   help="独立暖态补测：180秒固定预热，只新增3次扫描；保留来源排序3次和冷态失败记录")
     a = p.parse_args()
     if not a.dedicated_instance:
         p.error("Dedicated database required")
@@ -74,11 +80,34 @@ def main():
     try:
         pre = ex.preflight()
         specs = plan(space, pre["current_config"])
+        reused = []
+        if a.warm_recheck_source:
+            old = read_jsonl(a.warm_recheck_source/"trials.jsonl")
+            reused = [r for r in old if r["block"] == "sort"]
+            if len(reused) != 3 or any(not r["valid"] for r in reused):
+                raise ValueError("Three real valid sort measurements required for warm-only revision")
+            specs = [s for s in specs if s["block"] == "scan"]
         atomic_json(a.output/"manifest.json", {"mode": "online_dynamic_zero_llm_calibration",
             "plan": specs, "warmup_seconds": 15, "measurement_seconds": 60,
             "gate": {"min_gain": .05, "max_reference_drift": .20}, "noise_minimum": .02,
-            "preflight": pre, "simulated": False, **source_provenance()})
+            "preflight": pre, "simulated": False,
+            "warm_recheck_source": str(a.warm_recheck_source) if a.warm_recheck_source else None,
+            "reused_sort_records_fingerprint": fingerprint(reused) if reused else None,
+            "new_measurements_planned": len(specs), **source_provenance()})
         started = time.monotonic()
+        if a.warm_recheck_source:
+            wp = ReplayPlan(scenario="steady", phase_seconds=60, table_size=app.benchmark.workload.table_size,
+                tables=app.benchmark.workload.tables, read_percent=100, query_profile="range-mixed",
+                range_rows=32768, top_k=8192, seed=712)
+            client = GenerationalRequests(asdict(ex.settings), pre["current_config"])
+            warm = a.output/"warmup"; warm.mkdir()
+            try:
+                warmed = replay(wp, client, warm, simulated=False)
+                atomic_json(warm/"summary.json", warmed)
+                if not warmed["complete"]:
+                    raise RuntimeError("Common neutral 180-second warmup incomplete")
+            finally:
+                client.close()
         for spec in specs:
             if time.monotonic()-started > 900:
                 raise TimeoutError("No new trial after 900 seconds")
@@ -90,7 +119,13 @@ def main():
             atomic_json(a.output/"progress.json", {"completed_trials": len(records), "last_p95_ms": r["value_p95_ms"]})
             if not r["valid"]:
                 raise RuntimeError("Invalid calibration stream")
-        summary.update(completed=True, result=evaluate(records))
+        for r in reused:
+            r = {**r, "reused_from": str(a.warm_recheck_source)}
+            records.append(r)
+            with (a.output/"trials.jsonl").open("a") as f:
+                f.write(json.dumps(r, allow_nan=False)+"\n")
+        summary.update(completed=True, result=evaluate(records),
+                       new_measurements=len(specs), reused_measurements=len(reused))
     except Exception as exc:
         summary["error"] = redact(str(exc))
     finally:

@@ -1,9 +1,14 @@
 import math
+import json
+from pathlib import Path
+import tempfile
 import unittest
 from admtune.controller import Policy
 from admtune.online_dynamic_calibration import evaluate, plan
 from admtune.replay import ReplayPlan, make_schedule
 from admtune.surrogate import GaussianProcess
+from admtune.contracts import fingerprint
+from tools.analyze_online_dynamic import analyze
 from test_calibration import space
 
 
@@ -47,6 +52,36 @@ class OnlineDynamicTests(unittest.TestCase):
         self.assertTrue(all(r.operation == "read" for r in rs))
         self.assertEqual(sum(r.top_k == 0 for r in rs[:6000]), 5400)
         self.assertEqual(sum(r.top_k == 0 for r in rs[6000:12000]), 600)
+
+    def test_analysis_includes_whole_stream_not_only_measurement_windows(self):
+        # 人工数据只存在临时目录，用于公式/导出测试，绝不作为实验记录。
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); batch = root/"fixture"; (batch/"calibration").mkdir(parents=True)
+            cfg = space().defaults
+            records = [{"block": b, "kind": "candidate" if i == 1 else "reference",
+                        "name": f"{b}-{i}", "value_p95_ms": y, "valid": True,
+                        "config": cfg, "process_metrics_full_stream": {"cpu_core_equivalents": 1}}
+                       for b in ("scan", "sort") for i, y in enumerate((100, 80, 101))]
+            (batch/"calibration/trials.jsonl").write_text("".join(json.dumps(r)+"\n" for r in records))
+            (batch/"calibration/summary.json").write_text('{"completed":true}')
+            for method, delay in (("Default", .02), ("ADMTune", .01)):
+                d = batch/method; d.mkdir()
+                (d/"manifest.json").write_text(json.dumps({"preflight": {"current_config": cfg}}))
+                (d/"summary.json").write_text(json.dumps({"complete": True, "schedule_hash": "fixture",
+                    "counts": {"succeeded": 18000}, "phase_ready": []}))
+                with (d/"requests.jsonl").open("w") as f:
+                    for i in range(18000):
+                        f.write(json.dumps({"seq": i, "scheduled": i/10, "emitted": i/10,
+                            "completed": i/10+delay, "ok": True, "config_generation": 0,
+                            "session_config_hash": fingerprint(cfg)})+"\n")
+                if method == "ADMTune":
+                    (d/"trials.jsonl").write_text(json.dumps({"trial_id": "fixture",
+                        "phase_id": "phase-1", "config": cfg, "value": 10, "prediction": None,
+                        "status": "measured", "metadata": {"kind": "baseline"}})+"\n")
+                    (d/"llm_usage.json").write_text('{"total_tokens":50,"model":"fixture"}')
+            result = analyze(batch, root/"analysis")
+            self.assertAlmostEqual(result["cumulative_response_time_reduction_pct"], 50, places=6)
+            self.assertTrue((root/"analysis/dynamic_comparison.pdf").exists())
 
 
 if __name__ == "__main__":
