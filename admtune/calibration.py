@@ -203,7 +203,8 @@ def execute_trial(actuator, settings, spec, config, output, tables, table_size):
                       high_rate=spec["rate"] + 10, read_percent=spec["read_percent"],
                       tables=tables, table_size=table_size, seed=spec["seed"],
                       query_profile=spec.get("query_profile", "point"),
-                      range_rows=spec.get("range_rows", 0), top_k=spec.get("top_k", 0))
+                      range_rows=spec.get("range_rows", 0), top_k=spec.get("top_k", 0),
+                      steady_scan_percent=spec.get("steady_scan_percent", 50))
     folder = output / spec["name"]
     folder.mkdir(mode=0o700, exist_ok=False)
     resize_checks = prepare(actuator, config)  # no live request workers during a change

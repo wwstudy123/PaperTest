@@ -42,6 +42,7 @@ class ReplayPlan:
     query_profile: str = "point"
     range_rows: int = 0
     top_k: int = 0
+    steady_scan_percent: int = 50
 
     def __post_init__(self):
         if self.scenario not in {"composition", "intensity", "steady", "transient"}:
@@ -59,6 +60,9 @@ class ReplayPlan:
         if type(self.read_percent) is not int or self.read_percent not in range(0, 101, 10):
             raise ValueError("Read percentage must be an integer multiple of ten")
         mixed = self.query_profile == "range-mixed"
+        if (type(self.steady_scan_percent) is not int or self.steady_scan_percent not in range(0, 101, 10)
+                or (self.steady_scan_percent != 50 and not (mixed and self.scenario == "steady"))):
+            raise ValueError("Explicit scan mixture is only for read-only steady range-mixed streams")
         if self.scenario != "steady" and self.read_percent != 50 and not mixed:
             raise ValueError("Explicit read percentage is supported only by steady replay")
         if self.query_profile not in {"point", "range-scan", "range-sort", "range-mixed"}:
@@ -178,7 +182,7 @@ def make_schedule(plan: ReplayPlan) -> list[Request]:
         phase_index = second // plan.phase_seconds
         if plan.query_profile == "range-mixed":
             scans = (plan.base_rate * (1 if phase_index == 1 else 9) // 10
-                     if plan.scenario == "composition" else plan.base_rate // 2)
+                     if plan.scenario == "composition" else plan.base_rate * plan.steady_scan_percent // 100)
             limits = [0] * scans + [plan.top_k] * (plan.base_rate - scans)
             rng.shuffle(limits)
             for i, limit in enumerate(limits):

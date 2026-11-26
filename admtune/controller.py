@@ -266,6 +266,10 @@ class Controller:
                 self.store.event("prescreen", {
                     "phase_id": self.phase_id, "config_ids": [c.key for c in candidates],
                     "predictions": [asdict(p) for p in predictions], "eligible": eligible,
+                    "configs": [c.config for c in candidates], "context": z,
+                    "log_admission_floor": floor, "log_improvement_floor": gain_floor,
+                    "best_config": self.best_config, "baseline_value": self.baseline,
+                    "best_value": self.best_value, "beta": self.policy.beta,
                 })
                 if not eligible:
                     self.team.feedback = {

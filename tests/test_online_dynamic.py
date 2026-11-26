@@ -9,6 +9,7 @@ from admtune.replay import ReplayPlan, make_schedule
 from admtune.surrogate import GaussianProcess
 from admtune.contracts import fingerprint
 from tools.analyze_online_dynamic import analyze
+from tools.analyze_dynamic_stage1 import adaptation
 from test_calibration import space
 
 
@@ -52,6 +53,23 @@ class OnlineDynamicTests(unittest.TestCase):
         self.assertTrue(all(r.operation == "read" for r in rs))
         self.assertEqual(sum(r.top_k == 0 for r in rs[:6000]), 5400)
         self.assertEqual(sum(r.top_k == 0 for r in rs[6000:12000]), 600)
+
+    def test_audit_matches_frozen_phase_composition(self):
+        for pct in (10, 90):
+            p = ReplayPlan(scenario="steady", phase_seconds=28, read_percent=100,
+                query_profile="range-mixed", range_rows=32768, top_k=8192,
+                table_size=2000000, steady_scan_percent=pct)
+            rs = make_schedule(p)
+            self.assertEqual(sum(r.top_k == 0 for r in rs), 840*pct//100)
+        with self.assertRaises(ValueError):
+            ReplayPlan(steady_scan_percent=90)
+
+    def test_attainment_requires_three_complete_windows_and_none_not_zero(self):
+        rows = [{"end_s": x, "p95_ms": y, "requests": 200}
+                for x, y in [(20, 8), (40, 11), (60, 8), (80, 8), (100, 8)]]
+        self.assertEqual(adaptation(rows, 0, 10), 100)
+        rows[-1]["requests"] = 199
+        self.assertIsNone(adaptation(rows, 0, 10))
 
     def test_analysis_includes_whole_stream_not_only_measurement_windows(self):
         # 人工数据只存在临时目录，用于公式/导出测试，绝不作为实验记录。
