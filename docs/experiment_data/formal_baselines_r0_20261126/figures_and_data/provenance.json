@@ -1,0 +1,28 @@
+{
+  "real_run_evidence": [
+    {
+      "method": "Default",
+      "source_path": "runs/formal-baselines/results-20261126/admtune-formal-baselines-r0b-20261126/Default",
+      "manifest_sha256": "09045aa483c53264734ef4c596adacff477356f22c422d37ef36785c4a601807"
+    },
+    {
+      "method": "AgenticDB",
+      "source_path": "runs/formal-baselines/results-20261126/admtune-formal-baselines-r0b-20261126/AgenticDB",
+      "manifest_sha256": "b2cb24cc5ccd113c05c01b52d426c7d95070da438f826e7c0d608c6020b5d8b6"
+    },
+    {
+      "method": "AgentTune",
+      "source_path": "runs/formal-baselines/results-20261126/admtune-formal-tune-adm-r0-20261126/AgentTune",
+      "manifest_sha256": "858652d83db1696dbaeadd79b8f26fcc94037bf55d4666d83f3780a3795da381"
+    },
+    {
+      "method": "ADMTune",
+      "source_path": "runs/formal-baselines/results-20261126/admtune-formal-tune-adm-r0-20261126/ADMTune",
+      "manifest_sha256": "c0a576005384c8dbae1db69cdc2a74751c5f6f654798b53ec4f5405742f61b85"
+    }
+  ],
+  "literature_file": "docs/experiment_data/timed_static_100min_002/literature_curves.csv",
+  "literature_sha256": "ac08375ad1a53309b071808317d278e4bd33115cbb2f6ae8ab39de152999b761",
+  "literature_time_rescaled": false,
+  "reference_curves_are_measurements": false
+}

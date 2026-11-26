@@ -1,0 +1,16 @@
+{
+  "provenance.json": "031afeaa0f9a03df2b49f79259695d8fcf5c93885cad45ae45da1303c73b36df",
+  "measured_curves.csv": "f0f829328780a695108e9dc3627ac32a2f460ff98edaf6f0f59e0a50f1b6306f",
+  "measured_performance.csv": "782c37b58013987669d135ce6141fa940f98ca360e353024f9a4f1cf52d32ab0",
+  "literature_ratio_curves.csv": "7c73a9c63c3d86dd17d150ed7b4651627a8493c0d6097a9b084df9cacf2693cc",
+  "comparison_with_paper_ratio_references.png": "7f7446b43d31d4f385b25f496575afcc56ed448a0a349057163754e8f44bedb3",
+  "protocol_and_sources.json": "4215fabafa72dba43f0022cf34915aac2770cb888d948e32da7e668a99c42987",
+  "comparison_with_paper_ratio_references.pdf": "c9686a56a8d44c3189ef972c19cf30f93cc804543e63d16fef26af3a28f8ed8f",
+  "run_summaries.json": "3c82bca3320c181045922460c0c7f1dce5e5c7ef3f77043aae0786436f8d4e97",
+  "\u7ed3\u679c\u8bf4\u660e.md": "d8ebd46c610656e804c5ab777930333357bf9380e27e8f89382af533a672df97",
+  "raw_observations.jsonl": "f88c7b3a5a535e6cb84f1bf135aece8594684a429d0ee6b1d15aeabcd4a6e492",
+  "measured_comparison.png": "5970040572f889374a26d73cb1f645d82267feda296c9e1faea33f12c66ea5c7",
+  "raw_measurement_comparison.pdf": "a341534d79202d03b436987dfe2f304d2bac800271e2112299be5d1fef8154c2",
+  "measured_comparison.pdf": "46a11515daae148f8fb05e3a92a9bf8b664f1e23d02e86550e09e91ba76d3a7a",
+  "raw_measurement_comparison.png": "535f8d14613ade2792cbb238cc1730a0c58696e3efc33e48e763b2fcfdcd56d3"
+}

@@ -1,0 +1,184 @@
+[
+  {
+    "method": "Default",
+    "summary": {
+      "status": "completed",
+      "method": "Default",
+      "objective": "tps_per_p95:maximize",
+      "completed_trials": 3,
+      "valid_candidate_measurements": 0,
+      "baseline_value": 141.492343,
+      "search_value": 141.492343,
+      "final_verification_value": 141.888826,
+      "incumbent": {
+        "innodb_buffer_pool_size": 1073741824,
+        "innodb_io_capacity": 200,
+        "innodb_io_capacity_max": 2000,
+        "innodb_thread_concurrency": 0,
+        "sort_buffer_size": 262144
+      },
+      "stop_reason": "trial_cap",
+      "error": null,
+      "baseline_ready": true,
+      "budget": {
+        "limits": {
+          "trials": 8,
+          "wall_seconds": 1500,
+          "llm_calls": 20,
+          "llm_tokens": 64000,
+          "recovery_reserve_seconds": 60
+        },
+        "trial_slots_used": 3,
+        "llm_calls": 0,
+        "llm_tokens_or_reserved": 0,
+        "elapsed_seconds": 234.81947620213032
+      },
+      "initial_configuration_restored": true,
+      "finished_at_utc": "2026-11-25T17:57:01.685864+00:00"
+    },
+    "initial_implementation_commit": "739b881b0fa543b4b7dd5cd00e79ef9dac375155"
+  },
+  {
+    "method": "AgenticDB",
+    "summary": {
+      "status": "completed",
+      "method": "AgenticDB",
+      "objective": "tps_per_p95:maximize",
+      "completed_trials": 8,
+      "valid_candidate_measurements": 5,
+      "baseline_value": 137.066295,
+      "search_value": 137.066295,
+      "final_verification_value": 141.273965,
+      "incumbent": {
+        "innodb_buffer_pool_size": 1073741824,
+        "innodb_io_capacity": 200,
+        "innodb_io_capacity_max": 2000,
+        "innodb_thread_concurrency": 0,
+        "sort_buffer_size": 262144
+      },
+      "stop_reason": "trial_cap",
+      "error": null,
+      "baseline_ready": true,
+      "budget": {
+        "limits": {
+          "trials": 8,
+          "wall_seconds": 1500,
+          "llm_calls": 20,
+          "llm_tokens": 64000,
+          "recovery_reserve_seconds": 60
+        },
+        "trial_slots_used": 8,
+        "llm_calls": 6,
+        "llm_tokens_or_reserved": 31315,
+        "elapsed_seconds": 737.7795744761825
+      },
+      "initial_configuration_restored": true,
+      "finished_at_utc": "2026-11-26T01:30:32.380210+00:00"
+    },
+    "initial_implementation_commit": "739b881b0fa543b4b7dd5cd00e79ef9dac375155",
+    "continuation_implementation_commit": "bf1b5a7f3a84f333ff4c332f1ce9399f1a98eead"
+  },
+  {
+    "method": "AgentTune",
+    "summary": {
+      "status": "completed",
+      "method": "AgentTune",
+      "objective": "tps_per_p95:maximize",
+      "completed_trials": 8,
+      "valid_candidate_measurements": 6,
+      "baseline_value": 137.678552,
+      "search_value": 138.071866,
+      "final_verification_value": 134.08698,
+      "incumbent": {
+        "innodb_buffer_pool_size": 1073741824,
+        "innodb_io_capacity": 100,
+        "innodb_io_capacity_max": 2000,
+        "innodb_thread_concurrency": 0,
+        "sort_buffer_size": 262144
+      },
+      "stop_reason": "trial_cap",
+      "error": null,
+      "baseline_ready": true,
+      "budget": {
+        "limits": {
+          "trials": 8,
+          "wall_seconds": 1500,
+          "llm_calls": 20,
+          "llm_tokens": 64000,
+          "recovery_reserve_seconds": 60
+        },
+        "trial_slots_used": 8,
+        "llm_calls": 17,
+        "llm_tokens_or_reserved": 42538,
+        "elapsed_seconds": 674.5336632728577
+      },
+      "initial_configuration_restored": true,
+      "finished_at_utc": "2026-11-26T01:42:26.700993+00:00"
+    },
+    "initial_implementation_commit": "bf1b5a7f3a84f333ff4c332f1ce9399f1a98eead"
+  },
+  {
+    "method": "ADMTune",
+    "summary": {
+      "status": "completed",
+      "objective": "tps_per_p95:maximize",
+      "label_precision_decimals": 6,
+      "gp_policy": "repeat-aware",
+      "initial_noise_repeats": 0,
+      "repeat_noise_audit": {
+        "training_ids": [
+          "bb17d10b97194d839e6f5671d5dd68b2",
+          "be21ed33ade34340a0ec2dccb4019b14",
+          "5834f147bc984c52933018a60ef539bf",
+          "a89efe54a18b4126bbf4a93dab3759b0",
+          "78d3cc3fc2b748fe953468e9269c2395",
+          "b5ed09dca4754bd0b765151e07f5c397",
+          "e94ad85c7f6241f39ff394429d74db79"
+        ],
+        "repeat_groups": 1,
+        "degrees_of_freedom": 1,
+        "sse": 0.00025434718577571706,
+        "estimated_log_std": 0.015948265917513322,
+        "fixed_noise_log_std": 0.0,
+        "floor_eligible": false
+      },
+      "stop_reason": "No admissible novel candidate after one bounded refresh",
+      "completed_trials": 7,
+      "baseline_value": 132.789934,
+      "search_value": 132.789934,
+      "final_verification_value": 135.818942,
+      "incumbent": {
+        "innodb_buffer_pool_size": 1073741824,
+        "innodb_io_capacity": 200,
+        "innodb_io_capacity_max": 2000,
+        "innodb_thread_concurrency": 0,
+        "sort_buffer_size": 262144
+      },
+      "gp_training_count": 7,
+      "prospective_predictions": 1,
+      "gp_selected_candidates": 0,
+      "gp_rejection_decisions": 2,
+      "refresh_count": 1,
+      "final_reflection_committed": true,
+      "reflection_error": null,
+      "closed_loop_verified": true,
+      "budget": {
+        "limits": {
+          "trials": 8,
+          "wall_seconds": 1500,
+          "llm_calls": 20,
+          "llm_tokens": 64000,
+          "recovery_reserve_seconds": 60
+        },
+        "trial_slots_used": 7,
+        "llm_calls": 5,
+        "llm_tokens_or_reserved": 10542,
+        "elapsed_seconds": 603.0252457335591
+      },
+      "method": "ADMTune",
+      "initial_configuration_restored": true,
+      "finished_at_utc": "2026-11-26T01:53:08.104557+00:00"
+    },
+    "initial_implementation_commit": "bf1b5a7f3a84f333ff4c332f1ce9399f1a98eead"
+  }
+]

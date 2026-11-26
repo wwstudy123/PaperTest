@@ -41,7 +41,7 @@ def plot(run_dirs, output, literature=None):
             if m[key] != reference[key]:
                 raise ValueError(f"不同协议不能直接组合：{key}")
     output.mkdir(parents=True, exist_ok=False)
-    curves, table, evidence = [], [], []
+    curves, table, evidence, observations = [], [], [], []
     default = next((r for m, _, r in loaded if m["method"] == "Default"), None)
     if default is None:
         raise ValueError("需要本次真实 Default 参考")
@@ -52,6 +52,12 @@ def plot(run_dirs, output, literature=None):
     for path, (m, s, rs) in zip(run_dirs, loaded):
         method, best = m["method"], rs[0]
         for r in rs:
+            observations.append({"method": method, "repeat": m["repeat"], "trial_id": r["trial_id"],
+                "trial": r["metadata"]["seq"], "kind": r["metadata"]["kind"], "config": r["config"],
+                "objective": r["value"], "tps": r["metadata"]["raw_tps"],
+                "p95_ms": r["metadata"]["p95_latency_ms"], "accepted": r["metadata"].get("accepted", False),
+                "active_elapsed_seconds": r["metadata"]["active_elapsed_seconds"],
+                "prediction": r.get("prediction")})
             if r["metadata"]["kind"] != "verification":
                 if r["metadata"]["kind"] == "baseline" or r["metadata"].get("accepted"):
                     best = r
@@ -61,6 +67,8 @@ def plot(run_dirs, output, literature=None):
                 "time_min": r["metadata"]["active_elapsed_seconds"]/60,
                 "objective": value_source["value"], "tps": value_source["metadata"]["raw_tps"],
                 "latency_ms": value_source["metadata"]["p95_latency_ms"],
+                "raw_objective": r["value"], "raw_tps": r["metadata"]["raw_tps"],
+                "raw_latency_ms": r["metadata"]["p95_latency_ms"],
                 "value_trial_id": value_source["trial_id"]})
         final = rs[-1]
         values = default_values if method == "Default" else {
@@ -97,6 +105,12 @@ def plot(run_dirs, output, literature=None):
                                   "formula": "local Default median * paper value(t) / paper value(0)"})
     write_csv(output/"measured_performance.csv", table, list(table[0]))
     write_csv(output/"measured_curves.csv", curves, list(curves[0]))
+    (output/"raw_observations.jsonl").write_text("".join(
+        json.dumps(r, ensure_ascii=False, allow_nan=False)+"\n" for r in observations))
+    atomic_json(output/"protocol_and_sources.json", {
+        "policy": reference["comparison_protocol"], "space": reference["space"],
+        "sources": reference["sources"], "model": reference.get("model"),
+        "performance_table_uses": "independent final measurement; Default: median of three actual measurements"})
     if estimates:
         write_csv(output/"literature_ratio_curves.csv", estimates, list(estimates[0]))
     atomic_json(output/"provenance.json", {"real_run_evidence": evidence,
@@ -105,7 +119,7 @@ def plot(run_dirs, output, literature=None):
         "literature_time_rescaled": False, "reference_curves_are_measurements": False})
     plt.rcParams.update({"font.family": "DejaVu Serif", "font.size": 10, "pdf.fonttype": 42,
                          "axes.linewidth": .8})
-    def draw(include_reference, name):
+    def draw(include_reference, name, raw=False):
         fig, axes = plt.subplots(1, 3, figsize=(12, 3.8))
         for ax, field, title, ylabel in zip(axes,
                 ("objective", "tps", "latency_ms"),
@@ -123,7 +137,8 @@ def plot(run_dirs, output, literature=None):
                     ax.plot([0, horizon], [value, value], "--", color=color, lw=1.3, label=label)
                     continue
                 search = [r for r in rs if r["kind"] != "verification"]
-                ax.plot([r["time_min"] for r in search], [r[field] for r in search],
+                yfield = "raw_"+field if raw else field
+                ax.plot([r["time_min"] for r in search], [r[yfield] for r in search],
                         "-", color=color, marker=marker, ms=4, lw=1.4, label=label)
                 final = rs[-1]
                 ax.scatter(final["time_min"], final[field], marker=marker, s=45,
@@ -135,12 +150,14 @@ def plot(run_dirs, output, literature=None):
                         ax.plot([r["time_min"] for r in rs], [r[field] for r in rs],
                             "--", color=STYLE[method][0], lw=1.1,
                             label=method+" (paper-ratio estimate)")
-            ax.set(xlabel="Tuning time (min)", ylabel=ylabel, title=title, xlim=(0, horizon*1.04))
+            ax.set(xlabel="Active tuning time (min)", ylabel=ylabel, title=title, xlim=(0, horizon*1.04))
             ax.grid(alpha=.25, lw=.5); ax.tick_params(direction="in", top=True, right=True)
         handles, labels = axes[0].get_legend_handles_labels()
         fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(.5, .98),
                    ncol=3, frameon=False, fontsize=8)
         footer = "One real run per method; hollow markers: independent final measurements."
+        if raw:
+            footer += "\nSearch markers show actual candidate measurements, including rejected configurations."
         if include_reference:
             footer += "\nDashed colored curves: published ratios anchored to local Default; not local experiments."
         fig.text(.5, .02, footer, ha="center", fontsize=8)
@@ -149,6 +166,7 @@ def plot(run_dirs, output, literature=None):
             fig.savefig(output/f"{name}.{suffix}", dpi=260, bbox_inches="tight")
         plt.close(fig)
     draw(False, "measured_comparison")
+    draw(False, "raw_measurement_comparison", raw=True)
     if estimates:
         draw(True, "comparison_with_paper_ratio_references")
     lines = ["# 单轮真实基线结果", "", "实线为实测配置的运行内已接受最优；空心点为最终独立复测。"

@@ -214,7 +214,7 @@ class FormalBaselineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             manifest = {"simulated": False, "method": "Default", "repeat": 0,
-                        "comparison_protocol": {"fixture": True}, "benchmark": {}, "space": []}
+                        "comparison_protocol": {"fixture": True}, "benchmark": {}, "space": [], "sources": {}}
             source = root/"Default"; source.mkdir()
             (source/"manifest.json").write_text(json.dumps(manifest))
             (source/"summary.json").write_text(json.dumps({"status": "completed", "completed_trials": 3,

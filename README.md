@@ -4,6 +4,8 @@
 
 **已保存真实静态调优及配置诊断记录，但尚未完成同协议、多方法、多种子正式实验。模拟结果不能作为实测结果。**
 
+**2026-11-26 单轮基线已补跑**：Default、AgenticDB（DB-only）、AgentTune、ADMTune 共26次真实测量，28次真实LLM调用／84395 token。[结果与对比图](docs/FORMAL_BASELINES_RESULTS_20261126.md) · [下载图和数据](docs/exports/admtune_baselines_r0_20261126.zip)。本轮没有确认ADMTune的综合性能优势；GPTuner、CDBTune另以明确标注的论文比例参考虚线预览，不作为实测。
+
 **2026-11-26科研图包**：[下载ZIP](docs/exports/admtune_plot_pack_20261126.zip) · [10组图及数据索引](docs/PLOT_PACKAGE_20261126.md)。本地265项测试通过。新GP臂中断已保留并完成独立收尾，两臂均未接受新配置；正式基线、独立重复和真实消融仍需补齐，见[最新结果](docs/COMPOSITE_GP_PAIR_RESULTS_20261126.md)。
 
 2026-11-25最新进度：综合目标第二轮真实闭环验收通过，7次有效测量、5次API/10641 tokens；未找到优于初始配置的综合指标结果。见[第二轮数据与曲线](docs/COMPOSITE_PILOT_002_RESULTS_20261125.md)。[首轮失败证据及修复](docs/COMPOSITE_PILOT_RESULTS_20261125.md)仍保留。
