@@ -1,0 +1,124 @@
+{
+  "Default": {
+    "requests": 18000,
+    "overall_p95_ms": 70.71687839925288,
+    "total_response_time_s": 796.8157746642828,
+    "counts": {
+      "offered": 18000,
+      "submitted": 18000,
+      "dropped": 0,
+      "succeeded": 18000,
+      "failed": 0
+    },
+    "phase_ready": [
+      {
+        "end": 8,
+        "phase_id": "phase-1"
+      },
+      {
+        "end": 616,
+        "phase_id": "phase-2"
+      },
+      {
+        "end": 1216,
+        "phase_id": "phase-3"
+      }
+    ]
+  },
+  "ADMTune": {
+    "requests": 18000,
+    "overall_p95_ms": 62.88367323577404,
+    "total_response_time_s": 673.383890889585,
+    "counts": {
+      "offered": 18000,
+      "submitted": 18000,
+      "dropped": 0,
+      "succeeded": 18000,
+      "failed": 0
+    },
+    "phase_ready": [
+      {
+        "end": 8,
+        "phase_id": "phase-1"
+      },
+      {
+        "end": 616,
+        "phase_id": "phase-2"
+      },
+      {
+        "end": 1216,
+        "phase_id": "phase-3"
+      }
+    ],
+    "valid_observations": 15,
+    "reflection_commits": 3,
+    "gp_fit_events": 16,
+    "llm_calls": 12,
+    "control_flow_completed": true,
+    "closed_loop_completed": true,
+    "gp_selected_execution_exercised": true,
+    "phases": [
+      {
+        "phase_id": "phase-1",
+        "ready_at": 8,
+        "finished_at": 546.1833635941148,
+        "baseline_value": 67.324969,
+        "search_best_value": 58.452068,
+        "best_config": {
+          "innodb_buffer_pool_size": 2147483648,
+          "innodb_io_capacity": 400,
+          "innodb_io_capacity_max": 2000,
+          "sort_buffer_size": 524288
+        },
+        "verification_values": [
+          58.05946
+        ],
+        "valid_candidates": 4
+      },
+      {
+        "phase_id": "phase-2",
+        "ready_at": 616,
+        "finished_at": 1061.1602888405323,
+        "baseline_value": 62.039842,
+        "search_best_value": 56.014699,
+        "best_config": {
+          "innodb_buffer_pool_size": 2147483648,
+          "innodb_io_capacity": 400,
+          "innodb_io_capacity_max": 2000,
+          "sort_buffer_size": 8388608
+        },
+        "verification_values": [
+          51.885098
+        ],
+        "valid_candidates": 3
+      },
+      {
+        "phase_id": "phase-3",
+        "ready_at": 1216,
+        "finished_at": 1573.0650917068124,
+        "baseline_value": 46.750526,
+        "search_best_value": 46.750526,
+        "best_config": {
+          "innodb_buffer_pool_size": 2147483648,
+          "innodb_io_capacity": 400,
+          "innodb_io_capacity_max": 2000,
+          "sort_buffer_size": 8388608
+        },
+        "verification_values": [
+          45.228011
+        ],
+        "valid_candidates": 2
+      }
+    ],
+    "llm_tokens": 15521,
+    "model": "qwen3.7-plus"
+  },
+  "comparison": {
+    "cumulative_response_time_reduction_pct": 15.49064259259959,
+    "schedule_hash": "944b902f94442ceb12ec88458d42cc84911718651c3372e582c661d50fa7a1c2",
+    "same_request_plan": true,
+    "requests_include_configuration_transitions": true,
+    "window_seconds": 20,
+    "independent_repetitions": 1
+  }
+}

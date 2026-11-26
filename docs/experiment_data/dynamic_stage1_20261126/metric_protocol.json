@@ -1,0 +1,12 @@
+{
+  "primary": [
+    "end-to-end P95 including configuration transitions",
+    "actual cumulative successful completions",
+    "time to first three qualifying 20s cohorts"
+  ],
+  "threshold_rule": "0.9 * paired Default median window P95",
+  "pilot_scoring_defined_after_run": true,
+  "pilot_not_counted_as_frozen_formal_repetition": true,
+  "fixed_rate_counts_may_overlap": true,
+  "all_requests_included": true
+}

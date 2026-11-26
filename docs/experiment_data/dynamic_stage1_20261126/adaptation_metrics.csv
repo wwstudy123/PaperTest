@@ -1,0 +1,7 @@
+method,phase,target_p95_ms,attainment_seconds,definition,pilot_posthoc_scoring
+Default,A1,57.830111794173696,,first confirmation of three consecutive complete 20s cohorts at <=90% of paired Default median 20s P95,True
+ADMTune,A1,57.830111794173696,,first confirmation of three consecutive complete 20s cohorts at <=90% of paired Default median 20s P95,True
+Default,B,66.5950847044587,,first confirmation of three consecutive complete 20s cohorts at <=90% of paired Default median 20s P95,True
+ADMTune,B,66.5950847044587,60.0,first confirmation of three consecutive complete 20s cohorts at <=90% of paired Default median 20s P95,True
+Default,A2,56.57670781016349,,first confirmation of three consecutive complete 20s cohorts at <=90% of paired Default median 20s P95,True
+ADMTune,A2,56.57670781016349,60.0,first confirmation of three consecutive complete 20s cohorts at <=90% of paired Default median 20s P95,True

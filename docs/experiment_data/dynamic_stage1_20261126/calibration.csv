@@ -1,0 +1,7 @@
+block,kind,name,p95_ms,valid,config_json,cpu_core_equivalents
+scan,reference,scan-0,42.80802868306637,True,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}",0.2905508314388004
+scan,candidate,scan-1,34.77184399962425,True,"{""innodb_buffer_pool_size"": 2147483648, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}",0.25340880332372323
+scan,reference,scan-2,43.205561488866806,True,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}",0.2815213381529076
+sort,reference,sort-0,76.93113796412945,True,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}",0.6051413027607883
+sort,candidate,sort-1,65.25324620306492,True,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 8388608}",0.4926963081503145
+sort,reference,sort-2,79.10127304494381,True,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}",0.6103188669986499

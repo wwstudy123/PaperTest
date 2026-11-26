@@ -83,7 +83,7 @@ def create(batch, output):
                 ax.text(pos, ymax*.025, "NA", ha="center", fontsize=8, color=colors[method])
             else:
                 ax.bar(pos, value, width=.35, color=colors[method])
-    ax.set(xticks=x, xticklabels=["A1", "B", "A2"], ylim=(0, ymax*1.1),
+    ax.set(xticks=x, xticklabels=["A1", "B", "A2"], xlim=(-.55, 2.55), ylim=(0, ymax*1.1),
            title="(c) First sustained target attainment", ylabel="Confirmation time from phase start (s)")
     for ax in axes:
         ax.grid(alpha=.2, lw=.5); ax.tick_params(direction="in", top=True, right=True)

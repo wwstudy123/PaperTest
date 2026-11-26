@@ -1,0 +1,7 @@
+{
+  "cold_new_measurements": 6,
+  "warm_new_scan_measurements": 3,
+  "warm_reused_sort_measurements": 3,
+  "total_distinct_measured_trials": 9,
+  "calibration_csv_is_warm_effective_dataset": true
+}

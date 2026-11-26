@@ -4,6 +4,8 @@
 
 **已保存真实静态调优及配置诊断记录，但尚未完成同协议、多方法、多种子正式实验。模拟结果不能作为实测结果。**
 
+**动态阶段1已完成**：[真实结果与图](docs/DYNAMIC_STAGE1_RESULTS_20261126.md)。相同18000请求下，ADMTune全程P95相对Default降低11.08%，真实12次API／15521 token；两者均零失败/丢弃。单轮先导与独立GP拒绝审计已保存，尚未证明优于其他算法。后续按[冻结的四方法/消融协议](docs/DYNAMIC_MATRIX_PROTOCOL_20261126.md)进行，不把先导抵扣正式重复。
+
 **2026-11-26 单轮基线已补跑**：Default、AgenticDB（DB-only）、AgentTune、ADMTune 共26次真实测量，28次真实LLM调用／84395 token。[结果与对比图](docs/FORMAL_BASELINES_RESULTS_20261126.md) · [下载图和数据](docs/exports/admtune_baselines_r0_20261126.zip)。本轮没有确认ADMTune的综合性能优势；GPTuner、CDBTune另以明确标注的论文比例参考虚线预览，不作为实测。
 
 **2026-11-26科研图包**：[下载ZIP](docs/exports/admtune_plot_pack_20261126.zip) · [10组图及数据索引](docs/PLOT_PACKAGE_20261126.md)。本地265项测试通过。新GP臂中断已保留并完成独立收尾，两臂均未接受新配置；正式基线、独立重复和真实消融仍需补齐，见[最新结果](docs/COMPOSITE_GP_PAIR_RESULTS_20261126.md)。

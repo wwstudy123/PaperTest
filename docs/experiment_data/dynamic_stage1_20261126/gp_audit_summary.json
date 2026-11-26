@@ -1,0 +1,14 @@
+{
+  "completed": true,
+  "llm_calls": 0,
+  "reference_left_ms": 50.99193938076496,
+  "candidate_ms": 66.94950647652149,
+  "reference_right_ms": 51.60915777087211,
+  "reference_drift": 0.012104234465339259,
+  "utility_gain_vs_bracket": -0.2337426924303151,
+  "candidate_under_original_admission_ceiling": true,
+  "potential_missed_gain_signal": false,
+  "original_prediction_p95_ms": 63.76334255476501,
+  "conclusion_scope": "One candidate and one bracket; no overall false-rejection-rate claim",
+  "initial_configuration_restored": true
+}

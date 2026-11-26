@@ -51,7 +51,9 @@ def select_rejection(run):
                 continue
             for key, prediction in zip(a["config_ids"], a["predictions"]):
                 cfg = candidate_map[phase][key]; context = context_map[phase]
-                path = run/"gp_models"/f"gp-{prediction['model_version']:04d}.json"
+                path = run/"gp_models"/f"{phase}-gp-{prediction['model_version']:04d}.json"
+                if not path.exists():
+                    path = run/"gp_models"/f"gp-{prediction['model_version']:04d}.json"
                 gp = GaussianProcess.from_snapshot(json.loads(path.read_text()))
                 rebuilt = gp.predict([space.encode(cfg)+context])[0]
                 if any(abs(getattr(rebuilt, name)-prediction[name]) > 1e-9

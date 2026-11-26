@@ -31,7 +31,7 @@ from .phase_safety import PhaseFence, PhaseTiming
 from .provenance import source_provenance
 from .real_execution import AgenticDBExecutor
 from .reflection import Reflector
-from .replay import ReplayPlan, replay, monitor
+from .replay import ReplayPlan, replay, monitor, query_semantics
 from .replay_report import export_replay, write_csv
 from .security import redact
 from tools.mysql_resize import wait_buffer_pool_ready
@@ -51,7 +51,7 @@ def instance_lock(config_path):
     return handle
 
 
-def completion_checks(phases, records, events):
+def completion_checks(phases, records, events, *, require_gp=True, require_reflection=True, require_search=True):
     """保守不试也是合法决策；但不能把它等同于新配置预测效果已验证。"""
     ready_phases = len(phases) == 3 and all(
         p['baseline_value'] is not None and p['verification_values'] for p in phases
@@ -60,17 +60,17 @@ def completion_checks(phases, records, events):
         p['phase_id'] for kind, p in events
         if kind == 'prescreen' and p.get('config_ids') and not p.get('eligible')
     }
-    decisions = ready_phases and all(
+    decisions = ready_phases and (not require_search or all(
         p['valid_candidates'] > 0 or p['phase_id'] in refused for p in phases
-    )
+    ))
     has_prediction = any(t.trainable and t.prediction for t in records)
     has_screen = any(k == 'prescreen' for k, _ in events)
-    reflections = sum(k == 'reflection_committed' for k, _ in events) == 3
-    common = decisions and has_prediction and has_screen and reflections
+    reflections = not require_reflection or sum(k == 'reflection_committed' for k, _ in events) == 3
+    common = decisions and (not require_gp or (has_prediction and has_screen)) and reflections
     return {
         'acceptance_contract': 'control_flow_v2_resize_stable',
-        'control_flow_completed': bool(common and any(p['valid_candidates'] > 0 for p in phases)),
-        'closed_loop_completed': bool(common and all(p['valid_candidates'] > 0 for p in phases)),
+        'control_flow_completed': bool(common and (not require_search or any(p['valid_candidates'] > 0 for p in phases))),
+        'closed_loop_completed': bool(common and (not require_search or all(p['valid_candidates'] > 0 for p in phases))),
         'gp_selected_execution_exercised': any(
             t.trainable and t.prediction and t.metadata.get('kind') in {'startup', 'candidate'} for t in records
         ),
@@ -108,20 +108,34 @@ class PooledTeam(Team):
 
 class BatchedController(Controller):
     def reflect(self, events, *, force=False):
+        if not getattr(self, "reflection_enabled", True):
+            if force:
+                self.store.event("reflection_disabled", {"phase_id": self.phase_id})
+            return
         if force:
             return super().reflect(events, force=True)
         if events:
             self.store.event('reflection_batched', {'events': events, 'phase_id': self.phase_id})
 
+    def begin_phase(self, phase_id, context):
+        if not self.policy.cross_phase_memory:
+            from .surrogate import GaussianProcess
+            self.gp = GaussianProcess(kernel=self.policy.kernel,
+                config_dimensions=len(self.space.encode(self.current)), seed=self.seed)
+        return super().begin_phase(phase_id, context)
+
 
 class DynamicSession:
     def __init__(self, actuator, client, space, environment, output, plan, timing,
-                 *, backend_kind, seed, llm_calls=12, llm_tokens=20000, fixed_noise_log_std=0.0):
+                 *, backend_kind, seed, llm_calls=12, llm_tokens=20000, fixed_noise_log_std=0.0,
+                 max_output_tokens=1024):
         self.actuator, self.client, self.space, self.environment = actuator, client, space, environment
         self.output, self.plan, self.timing = output, plan, timing
         self.backend_kind, self.seed = backend_kind, seed
         self.call_limit, self.token_limit = llm_calls, llm_tokens
         self.fixed_noise_log_std = fixed_noise_log_std
+        self.max_output_tokens = max_output_tokens
+        self.method, self.ablation = "ADMTune", "full"
         self.telemetry = LiveTelemetry(PhaseFence(window_seconds=plan.window_seconds))
         self.thread = None
         self.error = None
@@ -189,13 +203,13 @@ class DynamicSession:
             if self.backend_kind == 'llm':
                 llm = LLMClient.from_env(dry_run=False)
                 llm.allow_fallback = False
-                backend = AgenticDBBackend(llm, ledger, max_output_tokens=1024,
+                backend = AgenticDBBackend(llm, ledger, max_output_tokens=self.max_output_tokens,
                                            trace_dir=self.output / 'llm_calls')
             else:
                 backend = HeuristicBackend(self.seed)
             executor = DynamicExecutor(self.actuator, self.client, self.telemetry, self.timing, self.plan,
                                        phase_id=lambda: self.control.phase_id if self.control else None)
-            controller = BatchedController(
+            controller_kwargs = dict(
                 space=self.space, environment=self.environment, objective=Objective('p95_latency_ms', 'minimize'),
                 detector=DetectorView(self.telemetry), executor=executor,
                 team=PooledTeam(self.space, backend, batch_size=6, max_selected=4),
@@ -203,9 +217,27 @@ class DynamicSession:
                     backend, audit_dir=self.output / 'reflection_maps',
                 ), max_batch=12, old_summary_limit=0), store=store,
                 ledger=ledger, policy=Policy(max_batches=1, max_replans=0, tolerated_drop=.2,
-                                            final_repeats=1, fixed_noise_log_std=self.fixed_noise_log_std), seed=self.seed,
+                    final_repeats=1, fixed_noise_log_std=self.fixed_noise_log_std,
+                    cross_phase_memory=self.ablation != "no_history",
+                    surrogate_gate=self.ablation != "no_gp"), seed=self.seed,
                 snapshot_dir=self.output / 'gp_models',
             )
+            if self.method == "ADMTune":
+                controller = BatchedController(**controller_kwargs)
+                controller.reflection_enabled = self.ablation != "no_reflection"
+            else:
+                from .native_dynamic import NativeDynamicController, PhaseBudgetLLM
+                def available():
+                    now = self.telemetry.elapsed()
+                    deadline = min(self.plan.duration, (int(now//self.plan.phase_seconds)+1)*self.plan.phase_seconds)
+                    return deadline-now-2*self.timing.trial_reserve
+                native_llm = PhaseBudgetLLM(llm, ledger, self.output/"llm_calls", available=available,
+                                           max_output_tokens=self.max_output_tokens)
+                controller = NativeDynamicController(method=self.method, llm=native_llm,
+                    workload={"query_semantics": query_semantics(self.plan),
+                        "tables": self.plan.tables, "rows_per_table": self.plan.table_size,
+                        "offered_rate_source": "observed windows", "db_version": self.environment.version},
+                    **controller_kwargs)
             self.control = controller
             current_ready = None
             while not self.telemetry.stopped:
@@ -257,7 +289,8 @@ class DynamicSession:
                         verification[controller.phase_id] = values
                         reflection_count = len(store.reflections())
                         controller.reflect(['phase_end'], force=True)
-                        if len(store.reflections()) != reflection_count + 1:
+                        if (self.method == "ADMTune" and self.ablation != "no_reflection"
+                                and len(store.reflections()) != reflection_count + 1):
                             raise RuntimeError('Phase reflection did not commit; inspect reflection_deferred, no automatic paid retry')
                         valid_candidates = sum(
                             t.trainable and t.constraints_ok and t.metadata.get('kind') in {'startup', 'candidate'}
@@ -303,7 +336,12 @@ class DynamicSession:
                     'reflection_commits': sum(k == 'reflection_committed' for k, _ in events),
                     'llm_api_attempts': ledger.llm_calls,
                     'heuristic_role_invocations': len(backend.calls) if isinstance(backend, HeuristicBackend) else 0,
-                    **completion_checks(phases, records, events),
+                    "method": self.method, "ablation": self.ablation,
+                    "shared_change_trigger": self.method != "ADMTune",
+                    **completion_checks(phases, records, events,
+                        require_gp=self.method == "ADMTune" and self.ablation != "no_gp",
+                        require_reflection=self.method == "ADMTune" and self.ablation != "no_reflection",
+                        require_search=self.method == "ADMTune"),
                     'is_thesis_evidence': False,
                     'note': '真实动态闭环试运行；未经正式校准、快照复位或方法对比，不能声称性能优势。',
                 }
@@ -375,6 +413,11 @@ def main():
     parser.add_argument('--range-rows', type=int, default=0)
     parser.add_argument('--top-k', type=int, default=0)
     parser.add_argument('--fixed-noise-log-std', type=float, default=0.0)
+    parser.add_argument('--method', choices=["ADMTune", "AgenticDB", "AgentTune"], default="ADMTune")
+    parser.add_argument('--ablation', choices=["full", "single_slice", "no_history", "no_gp", "no_reflection"],
+                        default="full")
+    parser.add_argument('--formal', action='store_true', help='冻结协议矩阵：共同上限36次API/120000token')
+    parser.add_argument('--max-output-tokens', type=int, default=1024)
     args = parser.parse_args()
     try:
         Policy(fixed_noise_log_std=args.fixed_noise_log_std)
@@ -384,8 +427,15 @@ def main():
         parser.error('Dedicated recoverable experimental instance required')
     if args.backend == 'llm' and not args.allow_paid_llm:
         parser.error('Explicit paid LLM authorization required')
-    if not 0 <= args.llm_calls <= 12 or not 0 <= args.llm_tokens <= 20000:
-        parser.error('Pilot is capped at 12 API calls and 20000 tokens')
+    call_cap, token_cap = (36, 120000) if args.formal else (12, 20000)
+    if not 0 <= args.llm_calls <= call_cap or not 0 <= args.llm_tokens <= token_cap:
+        parser.error(f'Cap: {call_cap} API calls and {token_cap} tokens')
+    if args.formal and (args.backend != "llm" or args.smoke):
+        parser.error("Formal matrix requires actual LLM and full measurement timing")
+    if not 1 <= args.max_output_tokens <= (1500 if args.formal else 1024):
+        parser.error("Output cap: pilot 1024, formal 1500")
+    if args.method != "ADMTune" and (args.backend != "llm" or args.ablation != "full"):
+        parser.error("Native baselines require actual LLM and cannot be relabelled ablations")
     if not args.smoke and (args.warmup_seconds < 15 or args.measurement_seconds < 60):
         parser.error('Shorter timing requires --smoke and must not be reported as calibrated or formal')
     try:
@@ -395,7 +445,8 @@ def main():
         timing.validate_phase(args.phase_seconds)
         plan = ReplayPlan(phase_seconds=args.phase_seconds, seed=42 + args.seed,
                           query_profile=args.query_profile, range_rows=args.range_rows, top_k=args.top_k,
-                          read_percent=100 if args.query_profile == 'range-mixed' else 50)
+                          read_percent=100 if args.query_profile == 'range-mixed' else 50,
+                          single_slice=args.ablation == "single_slice")
     except ValueError as exc:
         parser.error(str(exc))
     load_dotenv(args.env_file, override=True)
@@ -442,11 +493,18 @@ def main():
                     'data_snapshot_restored': False,
                     'reflection_evidence_encoding': 'reflection_evidence_ids_v1',
                     'fixed_noise_log_std': args.fixed_noise_log_std,
+                    'method': args.method, 'ablation': args.ablation, 'provider_seed_controlled': False,
+                    'shared_change_trigger': args.method != "ADMTune",
+                    'formal_protocol': args.formal, 'llm_call_limit': args.llm_calls,
+                    'llm_token_limit': args.llm_tokens,
+                    'max_output_tokens': args.max_output_tokens,
                     **source_provenance()}
         (args.output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
         session = DynamicSession(actuator, client, space, environment, args.output, plan, timing,
                                  backend_kind=args.backend, seed=args.seed, llm_calls=args.llm_calls,
                                  llm_tokens=args.llm_tokens, fixed_noise_log_std=args.fixed_noise_log_std)
+        session.max_output_tokens = args.max_output_tokens
+        session.method, session.ablation = args.method, args.ablation
         # 即使主线程无法及时停止控制线程，也不能提前释放实例锁。
         session.instance_lock = lock
         result = replay(plan, client, args.output, simulated=False, observer=session)

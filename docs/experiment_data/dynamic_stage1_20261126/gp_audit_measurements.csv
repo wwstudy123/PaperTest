@@ -1,0 +1,4 @@
+kind,p95_ms,valid,steady_scan_percent,config_json
+reference,50.99193938076496,True,10,"{""innodb_buffer_pool_size"": 2147483648, ""innodb_io_capacity"": 400, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 8388608}"
+rejected_candidate,66.94950647652149,True,10,"{""innodb_buffer_pool_size"": 2147483648, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 524288}"
+reference,51.60915777087211,True,10,"{""innodb_buffer_pool_size"": 2147483648, ""innodb_io_capacity"": 400, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 8388608}"

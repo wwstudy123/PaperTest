@@ -44,22 +44,28 @@ def context_record(record):
             "raw_tps": record["metadata"].get("raw_tps"),
             "p95_ms": record["metadata"].get("p95_latency_ms"),
             "measured_metrics": (record["metadata"].get("telemetry") or {}).get("delta"),
-            "accepted": record["metadata"].get("accepted", False)}
+            "accepted": record["metadata"].get("accepted", False),
+            "phase_id": record.get("phase_id"), "workload_context": record.get("context")}
 
 
 def benchmark_result(record):
     return BenchmarkResult(score=record["value"] or 0, valid=bool(record["value"]),
         tps=record["metadata"].get("raw_tps"), p95_latency_ms=record["metadata"].get("p95_latency_ms"),
-        primary_metric_name="tps_per_p95", primary_metric_value=record["value"])
+        primary_metric_name=record["metadata"].get("internal_score_metric", "tps_per_p95"),
+        primary_metric_value=record["value"])
 
 
 class AgenticDBStrategy:
     """上游单轮全局规划、执行反馈记忆、规则Auditor；只保留DB阶段。"""
-    def __init__(self, space, llm, workload, event):
+    def __init__(self, space, llm, workload, event, *, objective_text=None):
         self.space, self.llm, self.workload, self.event = space, llm, workload, event
         self.auditor = TuningAuditor(AuditorSettings())
         self.rounds, self.pending_proposal = [], None
         self.best_record = None
+        self.objective_text = objective_text or "最大化同次实测TPS/P95(ms)，不得当作纯TPS"
+        self.earlier_phase_measurements = []
+        self.physical_execution = "restored initial before/after each trial"
+        self.current_workload_phase = None
         self.skill = (Path(__file__).resolve().parents[1]/"skills/agenticdb_skill.md").read_text()
 
     def propose(self, records, incumbent):
@@ -74,18 +80,21 @@ class AgenticDBStrategy:
 
     def _propose(self, records, incumbent):
         best = self.best_record or records[0]
-        decision = self.auditor.audit(rounds=self.rounds, current_phase="db",
+        audit_rounds = (self.rounds if self.current_workload_phase is None else [
+            r for r in self.rounds if r["metadata"].get("workload_phase_id") == self.current_workload_phase])
+        decision = self.auditor.audit(rounds=audit_rounds, current_phase="db",
                                       best_result=benchmark_result(best))
         self.event("agenticdb_auditor", decision.to_dict())
         if decision.stop:
             raise StrategyStopped(decision.reason)
-        prompt = self.skill.replace("{{current_phase}}", "db").replace("{{task_brief}}", "目标：最大化同次实测TPS/P95(ms)，不得当作纯TPS。")
+        prompt = self.skill.replace("{{current_phase}}", "db").replace("{{task_brief}}", "目标："+self.objective_text)
         prompt = prompt.replace("{{benchmark_files}}", "按workload字段中的实际原生只读脚本和控制参数执行。")
         output = self.llm.complete("agenticdb_planner", {
-            "objective": {"name": "tps_over_p95", "direction": "maximize"},
+            "objective": {"description": self.objective_text, "internal_score_direction": "maximize"},
             "workload": self.workload, "allowed_knob_space": self.space.describe(),
-            "current_config": incumbent, "physical_execution": "restored initial before/after each trial",
+            "current_config": incumbent, "physical_execution": self.physical_execution,
             "history": self.rounds[-12:], "latest_observation": context_record(records[-1]),
+            "earlier_phase_measurements": self.earlier_phase_measurements,
             "auditor": decision.to_dict(),
             "validation_feedback": getattr(self, "validation_feedback", None),
             "numeric_grid_rule": "普通数值必须等于lower+n*step（n为非负整数），特殊值仅取special。"
@@ -118,7 +127,8 @@ class AgenticDBStrategy:
             self.best_record = record
         self.rounds.append({"round_id": len(self.rounds)+1, "proposal": self.pending_proposal,
             "decision": "accepted" if record["metadata"]["accepted"] else "rollback",
-            "result": benchmark_result(record).compact_dict(), "metadata": {"phase": "db"},
+            "result": benchmark_result(record).compact_dict(), "metadata": {
+                "phase": "db", "workload_phase_id": self.current_workload_phase},
             "observation": context_record(record)})
 
     def accepts(self, record, incumbent):
@@ -131,11 +141,13 @@ class AgenticDBStrategy:
 
 class AgentTuneStrategy:
     """论文7.1/7.2：匿名参数、range/step/special、R=3、k=2、top-5记忆。"""
-    def __init__(self, space, llm, workload, event):
+    def __init__(self, space, llm, workload, event, *, objective_text=None):
         self.space, self.llm, self.workload, self.event = space, llm, workload, event
         self.aliases = {f"knob{i+1}": n for i, n in enumerate(space.names)}
         self.selected, self.ranges, self.beam, self.queue = [], {}, [], []
         self.layer_results, self.expected, self.layer = [], 0, 0
+        self.objective_text = objective_text or "maximize same-measurement TPS/P95(ms), not TPS alone"
+        self.initial_record = None
 
     def anonymous_feedback(self, record):
         # 匿名不能只改当前配置：实测历史和父节点反馈也不能泄露真实旋钮键名。
@@ -159,7 +171,7 @@ class AgentTuneStrategy:
         selected = self.selected or self.llm.complete("agenttune_selector", {
             "catalog": catalog, "knob_num": min(4, len(catalog)), "workload": self.workload,
             "format_feedback": getattr(self, "format_feedback", None),
-            "objective": "maximize TPS/P95(ms) from the same complete measurement"},
+            "objective": self.objective_text},
             "你是AgentTune的KnobSelector。按负载选择指定数量的匿名旋钮。仅返回JSON对象"
             '{"selected":["knob1", "..."]}，不虚构目录外编号。', temperature=0)["selected"]
         if (not isinstance(selected, list) or len(selected) != min(4, len(catalog))
@@ -198,7 +210,7 @@ class AgentTuneStrategy:
     def propose(self, records, incumbent):
         if not self.selected or not self.ranges:
             self.initialize()
-            self.beam = [context_record(records[0])]
+            self.beam = [context_record(self.initial_record or records[0])]
         if not self.queue:
             if self.expected:
                 if len(self.layer_results) != self.expected:
@@ -217,7 +229,7 @@ class AgentTuneStrategy:
                             "current_configuration": {a: parent["config"][self.aliases[a]] for a in self.selected},
                             "parent_feedback": self.anonymous_feedback(parent),
                             "top_performing_memory_window": [self.anonymous_feedback(r) for r in memory],
-                            "objective": "maximize same-measurement TPS/P95(ms), not TPS alone"},
+                            "objective": self.objective_text},
                             "你是AgentTune的ConfigurationRecommender。根据当前父配置、执行反馈和记忆窗口"
                             "独立采样一个改进配置。必须完整给出所有ranges中的匿名旋钮，不给目录外键；"
                             "遵循普通范围/步长或特殊值。不虚构已测性能。仅返回JSON："

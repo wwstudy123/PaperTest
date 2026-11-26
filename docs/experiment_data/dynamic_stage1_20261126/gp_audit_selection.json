@@ -1,0 +1,46 @@
+{
+  "source_event_seq": 38,
+  "phase_id": "phase-2",
+  "candidate_id": "40c95c8025542258043eaabcc12e647e20910b937ac0b48f3792d610fc9bb3c0",
+  "candidate_config": {
+    "innodb_buffer_pool_size": 2147483648,
+    "innodb_io_capacity": 200,
+    "innodb_io_capacity_max": 2000,
+    "sort_buffer_size": 524288
+  },
+  "reference_config": {
+    "innodb_buffer_pool_size": 2147483648,
+    "innodb_io_capacity": 400,
+    "innodb_io_capacity_max": 2000,
+    "sort_buffer_size": 8388608
+  },
+  "reference_value_at_rejection": 56.014699,
+  "baseline_value_at_rejection": 62.039842,
+  "prediction": {
+    "latent_std": 0.11569860001751103,
+    "mean": -4.1551784571161035,
+    "model_version": 7,
+    "observation_std": 0.11741455414805581
+  },
+  "context": [
+    0.0,
+    0.0,
+    4.0,
+    -4.0,
+    0.0,
+    4.0,
+    -4.0,
+    0.0
+  ],
+  "optimistic_log_gain": 0.1052647896156036,
+  "steady_scan_percent": 10,
+  "original_admission_ceiling_p95_ms": 77.5498025,
+  "original_prediction_reconstructed": true,
+  "model_sha256": "e692d526247bc37c9125e14b1ce8c788b7d5c055168b7330cc171315767d7727",
+  "selection_rule": "highest original optimistic log improvement over incumbent, among candidates in completely rejected batches; selection before audit observations",
+  "source_manifest_sha256": "887396b26f9ce3cd81e604b776f31d5c3f0708fdd476e6a8f9a676cf1b17dd84",
+  "rejected_candidates_available": 7,
+  "audit_candidates": 1,
+  "llm_calls": 0,
+  "scope": "Independent post-run diagnostic; never backfilled into source model, budget or 30-minute curve"
+}

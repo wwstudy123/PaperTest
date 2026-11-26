@@ -54,6 +54,7 @@ class Controller:
         snapshot_dir: Path | None = None,
     ):
         self.space, self.environment, self.objective = space, environment, objective
+        self.seed = seed
         self.detector, self.executor, self.team = detector, executor, team
         self.reflector, self.store, self.ledger, self.policy = reflector, store, ledger, policy
         self.current = space.merge(executor.readback(), {})
@@ -232,7 +233,7 @@ class Controller:
             self.snapshot_dir.mkdir(parents=True, exist_ok=True)
             payload = {**self.gp.snapshot([t.trial_id for t in history]),
                        "phase_id": self.phase_id, "objective": self.objective.key}
-            path = self.snapshot_dir / f"gp-{self.gp.version:04d}.json"
+            path = self.snapshot_dir / f"{self.phase_id}-gp-{self.gp.version:04d}.json"
             path.write_text(json.dumps(payload, indent=2))
             self.store.event("gp_fit", {"path": path.name, "version": self.gp.version,
                                        "training_ids": payload["training_ids"]})

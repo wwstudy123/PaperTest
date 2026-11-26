@@ -172,6 +172,8 @@ class DynamicExecutor:
                 'observed_read_share': sum(r['operation'] == 'read' for r in recent) / max(1, len(recent)),
                 'observed_sort_share': sum(bool(r.get('top_k')) for r in recent) / max(1, len(recent)),
                 'runtime': self.actuator.diagnose().get('runtime_metrics', {}),
+                'declared_hardware': getattr(getattr(getattr(self.actuator, "app", None),
+                                                     "target", None), "hardware", {}),
                 'config_generation': self.client.generation}
 
     def _prepare(self, config):

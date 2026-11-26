@@ -54,15 +54,16 @@ class FinalLedger(DurableLedger):
 
 class BaselineLLM:
     """每个AgentTune子节点都真实独立调用，不使用同prompt缓存或隐式重试。"""
-    def __init__(self, client, ledger, output):
+    def __init__(self, client, ledger, output, *, max_output_tokens=1500):
         if client.dry_run or not client.api_key:
             raise ValueError("Real explicit LLM required")
         self.client, self.ledger, self.output = client, ledger, output
+        self.max_output_tokens = max_output_tokens
         client.response_retries = 0
         client.allow_fallback = False
     def complete(self, role, payload, system, *, temperature=.2, top_p=None):
         text = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
-        reserved = len((system+text).encode())+1500+64
+        reserved = len((system+text).encode())+self.max_output_tokens+64
         self.ledger.reserve_llm(reserved)
         trace = {"role": role, "payload": payload, "system_prompt": system,
                  "model": self.client.model, "sampling": {"temperature": temperature, "top_p": top_p},
@@ -70,7 +71,7 @@ class BaselineLLM:
         started = time.monotonic()
         try:
             result = self.client._call_openai_compatible(text, operation="baseline_"+role,
-                system_prompt=system, max_output_tokens=1500, temperature=temperature, top_p=top_p,
+                system_prompt=system, max_output_tokens=self.max_output_tokens, temperature=temperature, top_p=top_p,
                 timeout_s=max(1, min(self.client.timeout_s, int(self.ledger.remaining_seconds()-60))))
             trace["response"] = result
             if not isinstance(result, dict):

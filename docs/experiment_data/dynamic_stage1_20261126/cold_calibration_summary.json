@@ -1,0 +1,33 @@
+{
+  "completed": true,
+  "llm_calls": 0,
+  "result": {
+    "passed": false,
+    "metrics": {
+      "scan": {
+        "reference_left_ms": 65.40162451565263,
+        "candidate_ms": 34.25194434821605,
+        "reference_right_ms": 46.02221660315989,
+        "gain": 0.38519541232306276,
+        "reference_drift": 0.2963138615594273
+      },
+      "sort": {
+        "reference_left_ms": 76.93113796412945,
+        "candidate_ms": 65.25324620306492,
+        "reference_right_ms": 79.10127304494381,
+        "gain": 0.16359369465526685,
+        "reference_drift": 0.028208799950758978
+      }
+    },
+    "gate": {
+      "min_gain": 0.05,
+      "max_reference_drift": 0.2
+    },
+    "repeat_degrees_of_freedom": 2,
+    "estimated_log_std": 0.17626108040437177,
+    "fixed_noise_log_std": 0.17626108040437177,
+    "noise_note": "Global pilot floor: max(predeclared 2% log-scale minimum, paired-reference estimate). Two degrees of freedom only, not established general calibration.",
+    "llm_calls": 0
+  },
+  "initial_configuration_restored": true
+}

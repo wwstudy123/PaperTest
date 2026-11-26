@@ -1,0 +1,7 @@
+block,kind,p95_ms,config_json
+scan,reference,65.40162451565263,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
+scan,candidate,34.25194434821605,"{""innodb_buffer_pool_size"": 2147483648, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
+scan,reference,46.02221660315989,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
+sort,reference,76.93113796412945,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"
+sort,candidate,65.25324620306492,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 8388608}"
+sort,reference,79.10127304494381,"{""innodb_buffer_pool_size"": 1073741824, ""innodb_io_capacity"": 200, ""innodb_io_capacity_max"": 2000, ""sort_buffer_size"": 262144}"

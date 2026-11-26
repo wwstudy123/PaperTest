@@ -43,6 +43,7 @@ class ReplayPlan:
     range_rows: int = 0
     top_k: int = 0
     steady_scan_percent: int = 50
+    single_slice: bool = False
 
     def __post_init__(self):
         if self.scenario not in {"composition", "intensity", "steady", "transient"}:
@@ -221,7 +222,7 @@ def monitor(plan: ReplayPlan):
         for row in counts:
             row[ch] += plan.base_rate * slice_seconds / 2
     calibration = Window(0, plan.window_seconds, counts)
-    encoder = WorkloadEncoder([calibration])
+    encoder = WorkloadEncoder([calibration], single_slice=plan.single_slice)
     detector = PhaseDetector(encoder, change_threshold=3, stable_threshold=1,
                              confirm_windows=2, stable_windows=2)
     return catalog, detector, {"encoder": encoder.metadata(), "calibration": asdict(calibration),
@@ -431,6 +432,7 @@ def main():
     parser.add_argument("--table-size", type=int, default=100000)
     parser.add_argument("--range-rows", type=int, default=0)
     parser.add_argument("--top-k", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--guard-acceptance", action="store_true",
                         help="保持 15+60 秒观测，验收阶段预算及跨阶段拒绝；不调参")
     parser.add_argument("--dedicated-instance", action="store_true")
@@ -441,7 +443,7 @@ def main():
         plan = ReplayPlan(scenario=args.scenario, phase_seconds=args.phase_seconds,
                           query_profile=args.query_profile, table_size=args.table_size,
                           read_percent=100 if args.query_profile == "range-mixed" else 50,
-                          range_rows=args.range_rows, top_k=args.top_k)
+                          range_rows=args.range_rows, top_k=args.top_k, seed=args.seed)
         if args.guard_acceptance:
             from .phase_safety import GuardAcceptance
             guard = GuardAcceptance(plan)
