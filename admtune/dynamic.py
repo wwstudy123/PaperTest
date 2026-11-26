@@ -116,11 +116,12 @@ class BatchedController(Controller):
 
 class DynamicSession:
     def __init__(self, actuator, client, space, environment, output, plan, timing,
-                 *, backend_kind, seed, llm_calls=12, llm_tokens=20000):
+                 *, backend_kind, seed, llm_calls=12, llm_tokens=20000, fixed_noise_log_std=0.0):
         self.actuator, self.client, self.space, self.environment = actuator, client, space, environment
         self.output, self.plan, self.timing = output, plan, timing
         self.backend_kind, self.seed = backend_kind, seed
         self.call_limit, self.token_limit = llm_calls, llm_tokens
+        self.fixed_noise_log_std = fixed_noise_log_std
         self.telemetry = LiveTelemetry(PhaseFence(window_seconds=plan.window_seconds))
         self.thread = None
         self.error = None
@@ -202,7 +203,7 @@ class DynamicSession:
                     backend, audit_dir=self.output / 'reflection_maps',
                 ), max_batch=12, old_summary_limit=0), store=store,
                 ledger=ledger, policy=Policy(max_batches=1, max_replans=0, tolerated_drop=.2,
-                                            final_repeats=1), seed=self.seed,
+                                            final_repeats=1, fixed_noise_log_std=self.fixed_noise_log_std), seed=self.seed,
                 snapshot_dir=self.output / 'gp_models',
             )
             self.control = controller
@@ -373,7 +374,12 @@ def main():
     parser.add_argument('--query-profile', choices=['point', 'range-mixed'], default='point')
     parser.add_argument('--range-rows', type=int, default=0)
     parser.add_argument('--top-k', type=int, default=0)
+    parser.add_argument('--fixed-noise-log-std', type=float, default=0.0)
     args = parser.parse_args()
+    try:
+        Policy(fixed_noise_log_std=args.fixed_noise_log_std)
+    except ValueError as exc:
+        parser.error(str(exc))
     if not args.dedicated_instance:
         parser.error('Dedicated recoverable experimental instance required')
     if args.backend == 'llm' and not args.allow_paid_llm:
@@ -435,10 +441,12 @@ def main():
                     'constraints_p95_ms': actuator.max_p95_ms, 'actuator_benchmark_not_executed': True,
                     'data_snapshot_restored': False,
                     'reflection_evidence_encoding': 'reflection_evidence_ids_v1',
+                    'fixed_noise_log_std': args.fixed_noise_log_std,
                     **source_provenance()}
         (args.output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
         session = DynamicSession(actuator, client, space, environment, args.output, plan, timing,
-                                 backend_kind=args.backend, seed=args.seed, llm_calls=args.llm_calls, llm_tokens=args.llm_tokens)
+                                 backend_kind=args.backend, seed=args.seed, llm_calls=args.llm_calls,
+                                 llm_tokens=args.llm_tokens, fixed_noise_log_std=args.fixed_noise_log_std)
         # 即使主线程无法及时停止控制线程，也不能提前释放实例锁。
         session.instance_lock = lock
         result = replay(plan, client, args.output, simulated=False, observer=session)

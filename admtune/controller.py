@@ -34,12 +34,14 @@ class Policy:
     kernel: str = "joint"
     residual_threshold: float = 3
     final_repeats: int = 3
+    fixed_noise_log_std: float = 0.0
 
     def __post_init__(self):
         if (
             self.beta <= 0 or not 0 <= self.tolerated_drop < 1 or self.min_gain < 0
             or self.bootstrap < 2 or min(self.max_batches, self.max_training, self.final_repeats) < 1
             or self.max_replans < 0 or self.history_distance <= 0
+            or not math.isfinite(self.fixed_noise_log_std) or self.fixed_noise_log_std < 0
         ):
             raise ValueError("Invalid tuning policy")
 
@@ -224,7 +226,8 @@ class Controller:
             return
         x = [self.space.encode(t.config) + t.context for t in history]
         y = [self.objective.target(t.value) for t in history]
-        self.gp.fit(x, y, optimize=self.gp.version % 3 == 0)
+        self.gp.fit(x, y, optimize=self.gp.version % 3 == 0 or self.policy.fixed_noise_log_std > 0,
+                    fixed_noise_log_std=self.policy.fixed_noise_log_std)
         if self.snapshot_dir is not None:
             self.snapshot_dir.mkdir(parents=True, exist_ok=True)
             payload = {**self.gp.snapshot([t.trial_id for t in history]),
