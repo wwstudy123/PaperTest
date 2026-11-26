@@ -1,0 +1,78 @@
+{
+  "policy": {
+    "version": "dynamic_matrix_v1",
+    "phase_seconds": 600,
+    "phases": [
+      "A",
+      "B",
+      "A"
+    ],
+    "offered_rate": 10,
+    "query_profile": "range-mixed",
+    "range_rows": 32768,
+    "top_k": 8192,
+    "scan_fractions": [
+      0.9,
+      0.1,
+      0.9
+    ],
+    "neutral_prewarm_seconds": 180,
+    "true_trial_cap": 18,
+    "llm_call_cap": 36,
+    "llm_token_cap": 100000,
+    "measurement_warmup_seconds": 15,
+    "measurement_seconds": 60,
+    "fixed_noise_log_std": 0.02,
+    "max_output_tokens": 1500,
+    "independent_history_start": "empty per run; within-run facts retained unless ablated",
+    "native_dynamic_adapter": "shared observed-change trigger; restart source search per phase; keep accepted config and measured in-run history; no added GP/Reflexion",
+    "attainment": {
+      "reference": ".9 * paired Default median 20-second window P95 per phase",
+      "consecutive_complete_windows": 3,
+      "window_seconds": 20
+    },
+    "primary_metrics": [
+      "continuous end-to-end P95",
+      "actual cumulative successful completions",
+      "first sustained target confirmation from phase start"
+    ],
+    "provider_seed_controlled": false,
+    "pilot_seed_42_not_reused": true
+  },
+  "seeds": [
+    43
+  ],
+  "methods": [
+    "Default",
+    "AgenticDB",
+    "AgentTune",
+    "ADMTune"
+  ],
+  "ablation": "full",
+  "orders": {
+    "43": [
+      "AgenticDB",
+      "AgentTune",
+      "ADMTune",
+      "Default"
+    ]
+  },
+  "private_config_sha256": {
+    "workset-v2-target.yaml": "78a2d8bbb70d2fddeab7481054a460d62991a38a1ae091c79b52e4e0e87f5546",
+    "timed-readonly-100min.yaml": "87d403780540232d3035e148173e080dd9d28d81161261868f3b69a3526afd10",
+    "online-dynamic-knobs.yaml": "d149187962a94ced3c664243fb4c7f7680dc86a18742824a5bf4fcbc63cc2a03"
+  },
+  "python": "3.10.8",
+  "dependencies": {
+    "numpy": "1.26.4",
+    "scipy": "1.13.1",
+    "sqlglot": "27.29.0",
+    "paramiko": "4.0.0",
+    "PyYAML": "6.0.4",
+    "requests": "2.34.2",
+    "PyMySQL": "1.2.4"
+  },
+  "git_revision": "09cd9997d2c3272aa7af89cc25293c5b07e82262",
+  "git_dirty": false,
+  "working_source_sha256": "8c397e1d045e161706db91fe05d65d6d0e8abcef0bd96f07fc673706eda6a1c1"
+}

@@ -1,0 +1,61 @@
+{
+  "provisional_single_seed": true,
+  "metrics": [
+    {
+      "method": "Default",
+      "overall_p95_ms": 72.41536565124989,
+      "phase_p95_ms": [
+        66.45982563495636,
+        76.4918364584446,
+        65.80554880201818
+      ],
+      "calls": 0,
+      "tokens": 0,
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+      "postcheck": true,
+      "p95_reduction_vs_default_pct": 0.0
+    },
+    {
+      "method": "AgenticDB",
+      "overall_p95_ms": 53.825302049517624,
+      "phase_p95_ms": [
+        47.90712147951126,
+        57.693607360124595,
+        46.36663310229778
+      ],
+      "calls": 9,
+      "tokens": 68655,
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+      "postcheck": true,
+      "p95_reduction_vs_default_pct": 25.67143510848432
+    },
+    {
+      "method": "AgentTune",
+      "overall_p95_ms": 56.15293495357035,
+      "phase_p95_ms": [
+        56.99246563017369,
+        56.99938349425793,
+        52.93920114636421
+      ],
+      "calls": 33,
+      "tokens": 52223,
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+      "postcheck": true,
+      "p95_reduction_vs_default_pct": 22.457154709400882
+    },
+    {
+      "method": "ADMTune",
+      "overall_p95_ms": 59.498214349150636,
+      "phase_p95_ms": [
+        63.16154003143312,
+        60.48612259328365,
+        46.93598002195358
+      ],
+      "calls": 12,
+      "tokens": 15735,
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+      "postcheck": true,
+      "p95_reduction_vs_default_pct": 17.837583482361797
+    }
+  ]
+}

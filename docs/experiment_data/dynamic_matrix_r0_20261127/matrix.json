@@ -1,0 +1,31 @@
+{
+  "status": "completed",
+  "completed": [
+    {
+      "seed": 43,
+      "method": "AgenticDB",
+      "run_wall_seconds": 1817.0369919613004
+    },
+    {
+      "seed": 43,
+      "method": "AgentTune",
+      "run_wall_seconds": 1816.3152815923095
+    },
+    {
+      "seed": 43,
+      "method": "ADMTune",
+      "run_wall_seconds": 1816.4618782401085
+    },
+    {
+      "seed": 43,
+      "method": "Default",
+      "run_wall_seconds": 1811.2099558711052
+    }
+  ],
+  "ablation": "full",
+  "started_at_utc": "2026-11-26T16:47:40.691779+00:00",
+  "seed": 43,
+  "method": "Default",
+  "stage": "continuous_run",
+  "finished_at_utc": "2026-11-26T19:03:07.613992+00:00"
+}
