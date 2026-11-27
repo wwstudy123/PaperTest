@@ -1,0 +1,105 @@
+{
+  "repository": "https://github.com/DBoptimizer/OnlineTune.git",
+  "revision": "88ba8c35f554bc4a4f7f1a88257b3e8928f87a39",
+  "audit_scope": "static AST and asset/source inspection only; no external model imports or database mutations; zero LLM calls",
+  "python_files": 32,
+  "syntax_errors": [
+    {
+      "file": "onlinetune/safe/subdomainbo.py",
+      "line": 393,
+      "error": "unmatched ')'"
+    },
+    {
+      "file": "scripts/optimize.py",
+      "line": 26,
+      "error": "unexpected indent"
+    }
+  ],
+  "asset_presence": {
+    "setup.py": false,
+    "onlinetune/utils/dynamic_worklod.py": false,
+    "Workload2Vec/LSTM/model/vocabulary.txt": false,
+    "tune.model": false,
+    "scripts/tune.model": false
+  },
+  "included_encoder_files": [
+    "Workload2Vec/LSTM/model/checkpoint",
+    "Workload2Vec/LSTM/model/metadata.json",
+    "Workload2Vec/LSTM/model/model.data-00000-of-00001",
+    "Workload2Vec/LSTM/model/model.index",
+    "Workload2Vec/LSTM/model/model.meta"
+  ],
+  "checks": {
+    "missing_context_module": {
+      "file": "onlinetune/dbenv.py",
+      "lines": [
+        14
+      ]
+    },
+    "missing_baseline_predictor": {
+      "file": "onlinetune/safe/real_database.py",
+      "lines": [
+        31
+      ]
+    },
+    "kernel_keyword_typo": {
+      "file": "onlinetune/safe/models/gp.py",
+      "lines": [
+        45
+      ]
+    },
+    "historical_knob_dimension_40": {
+      "file": "onlinetune/dbscan.py",
+      "lines": [
+        51
+      ]
+    },
+    "legacy_namespace": {
+      "file": "onlinetune/safe/model.py",
+      "lines": [
+        31
+      ]
+    },
+    "latency_cli_not_wired_into_reward": {
+      "file": "onlinetune/safe/real_database.py",
+      "lines": [
+        66
+      ]
+    }
+  },
+  "license_files": [],
+  "source_sha256": {
+    "Workload2Vec/LSTM/autoencoder.py": "558d2886f685374f82cacdae74733496205457d025684aab45fd7f3444a80ca5",
+    "Workload2Vec/LSTM/codify-sentences.py": "84138a0da124d6efa448afec99f2c58552d40f39e3cf6a74e2805b477e118f7d",
+    "Workload2Vec/LSTM/sql_prepare.py": "c31d882b218ab9d0a0dc42a26ba4f961a376f3862525a77b1d074a9d1184ec42",
+    "Workload2Vec/LSTM/train-autoencoder.py": "d8e9b4ebec9173ccba216a23a0a7a68f1875cde536ad8922545e5022331949ea",
+    "Workload2Vec/LSTM/utils.py": "81df7a705e69f329cfcd6021fdd0a2b2230f01737cfa250586fb65becc47d8c1",
+    "Workload2Vec/plan2vec.py": "85c66b0e234a1290070d725944c2e752ac50f75e0f2348fd76145428e9ed0723",
+    "Workload2Vec/sqlExtracting.py": "02e8733f439c3e30cb665f01120d7c53179f66cf9d168a711e77bb73623d7185",
+    "onlinetune/autoencoder.py": "558d2886f685374f82cacdae74733496205457d025684aab45fd7f3444a80ca5",
+    "onlinetune/dbconnector.py": "bfcb3013bf9f9daea3f101e808203188ef491e6f3a550ec18a72ebaaf83d64a6",
+    "onlinetune/dbenv.py": "b31c4048a867850cab9d142225bd5b7aec4ace0991e0bc2092aefbad66b09136",
+    "onlinetune/dbscan.py": "c67de0c834d17454d6888bc061373f6f589188e37de25fb1edc0425922adc27a",
+    "onlinetune/knobs.py": "345b93b8789a3b4627c801d38395d1759f56a9fef7e54af1bea77b873bfbe59d",
+    "onlinetune/safe/algorithm.py": "4ea4ffda667696a2b09ee1a49acd706c7db872c597c30fb557c64dc52fe3556c",
+    "onlinetune/safe/benchmark.py": "367e0d9acbe4d62f966333c3867a0a0162c6f0edea07ec8d5479e567f17a4a1d",
+    "onlinetune/safe/config.py": "a0d99773ab62129e6e6f86e9a556f4269ba2d0fc6e85e4600a08aa0956d09271",
+    "onlinetune/safe/domain.py": "b04514e866e0a2f54bc9e2e0dbbdd52436a79e79fb65b08b2ab2599902d62957",
+    "onlinetune/safe/model.py": "e4da5db3f88de399c94ec5a5b9e62a06a65fa3706a91c5fe8cecb2ed729d54d2",
+    "onlinetune/safe/models/gp.py": "3e660badb1e40340f80f88888b06007e63ecaf31b4a7c2f8df0537a22c71d011",
+    "onlinetune/safe/real_database.py": "e3f481d6259f6620807bac05cf1bac08db8c93bf53ff12f052364ffd590ab1af",
+    "onlinetune/safe/rule_based.py": "646396288d02ca16256cc54fce37af7646a85c60153612075185ddccd0a5ca51",
+    "onlinetune/safe/safeopt.py": "2679594eef425f9f14643dbd705bd1f9a68f8da908b80c657d63f203e74531f0",
+    "onlinetune/safe/subdomain.py": "925870d87717b9a7f14739bf31390a8830df970dcb330ff763a9af26df3b864a",
+    "onlinetune/safe/subdomainbo.py": "6c90ffd133ce98c9f164aa870bb3e2bcb856d11879a55df85ee3a5e9a8307675",
+    "onlinetune/safe/utils.py": "06701fd124f7de66ffcf56c1fed5db07e08e6718574d779351d3b6f4560866e5",
+    "onlinetune/tuner_safe.py": "0483981c37ee487f8be2175a10ed387275b9479f8cbe3fc49aa59f6b9bee5fea",
+    "onlinetune/utils/autotune_exceptions.py": "80ac7cb30b6a8d6ce0a4651d4c3a01b848cac3b85d1d66b437920f8ded99808b",
+    "onlinetune/utils/encoder_utils.py": "81df7a705e69f329cfcd6021fdd0a2b2230f01737cfa250586fb65becc47d8c1",
+    "onlinetune/utils/helper.py": "b9a70a487d43c8ef451f22923030fbcf53a878eabbc6a42fdf248c79e6c03516",
+    "onlinetune/utils/logger.py": "07115291165e99d678516155bf859e72c98ff9c9893005eefc334ad8b37cd13e",
+    "onlinetune/utils/parser.py": "9add26f95eb7cfe18bda0fafc47a63b7fe26b61d417f93acc5f497af9fa3c8a7",
+    "onlinetune/workload.py": "2acf62d8967b305a22217a06bbdcc0d29b6c069b86d0207f32ee91dd88566f55",
+    "scripts/optimize.py": "506941619c16e5e1a76adc32efe290bf357fa7a7f4b539540c8651fff65160ff"
+  }
+}
