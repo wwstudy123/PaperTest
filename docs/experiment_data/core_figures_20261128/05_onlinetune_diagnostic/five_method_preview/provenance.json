@@ -1,0 +1,74 @@
+{
+  "seed": 43,
+  "independent_repetitions": 1,
+  "sources": {
+    "Default": {
+      "requests_sha256": "3fcfc531dd25a51c8a4086bad11d249dc35aa7b859b33722f9aa0cf0c7ce1093",
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+      "actual_source": "runs/dynamic-matrix-r0-20261127/dynamic-matrix-r0-20261127/seed-43/Default",
+      "source_revision": "09cd9997d2c3272aa7af89cc25293c5b07e82262",
+      "hardware_id": null,
+      "adapter": null
+    },
+    "AgenticDB": {
+      "requests_sha256": "52daba5b16f09314f720ab2a0df37cdad05d44a08683934f6a74fd4c5a53ef56",
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+      "actual_source": "runs/dynamic-matrix-r0-20261127/dynamic-matrix-r0-20261127/seed-43/AgenticDB",
+      "source_revision": "09cd9997d2c3272aa7af89cc25293c5b07e82262",
+      "hardware_id": "autodl-container-aa6147b8a1-c2c6efb0",
+      "adapter": null
+    },
+    "AgentTune": {
+      "requests_sha256": "668f6158947ca1aed350a35f86dd1b581258fae9ed678b820239f8a7c630138b",
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+      "actual_source": "runs/dynamic-matrix-r0-20261127/dynamic-matrix-r0-20261127/seed-43/AgentTune",
+      "source_revision": "09cd9997d2c3272aa7af89cc25293c5b07e82262",
+      "hardware_id": "autodl-container-aa6147b8a1-c2c6efb0",
+      "adapter": null
+    },
+    "ADMTune": {
+      "requests_sha256": "501d69e00460e0d5a4db6978c661e694ffc15c478b212cb15b94662061566a8d",
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+      "actual_source": "runs/dynamic-matrix-r0-20261127/dynamic-matrix-r0-20261127/seed-43/ADMTune",
+      "source_revision": "09cd9997d2c3272aa7af89cc25293c5b07e82262",
+      "hardware_id": "autodl-container-aa6147b8a1-c2c6efb0",
+      "adapter": null
+    },
+    "OnlineTune": {
+      "requests_sha256": "0a2bc8a7b02418b34700a160faa303f8284c18a9bdf11f26891f76fe197b0097",
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+      "actual_source": "runs/onlinetune-dynamic-20261128/onlinetune-dynamic-r0-20261128/OnlineTune",
+      "source_revision": "9cf60db274a582a868a2b41af1c2106dfe667bbf",
+      "hardware_id": "autodl-container-77c34b852e-98bb92e3",
+      "adapter": {
+        "name": "OnlineTune dynamic adapter",
+        "source_revision": "88ba8c35f554bc4a4f7f1a88257b3e8928f87a39",
+        "context": [
+          "read_share",
+          "write_share",
+          "range_scan_share",
+          "range_sort_share",
+          "point_read_share",
+          "mean_range_fraction",
+          "mean_limit_fraction",
+          "aggregate_fraction",
+          "nested_select_share",
+          "log_offered_rate"
+        ],
+        "encoder": "observed SQL structure, not unavailable pretrained LSTM or future phase labels",
+        "routing": "past windows only; StandardScaler/PCA3/DBSCAN(.7,8), RBF SVM gamma=auto",
+        "novel_context": "provisional region when distance to observed region center exceeds .25",
+        "default_reference": "budgeted measured phase anchor; historical raw utilities recentered on activation",
+        "model_reuse": "region keyed raw observations and upstream GP hyperparameters retained on return",
+        "cross_region_transfer": "objective-only transfer for >10% gains above observed 90th percentile",
+        "objective": "inverse measured P95; original objective-difference and relative-constraint GPs",
+        "llm_calls": 0
+      }
+    }
+  },
+  "all_requests_included": true,
+  "window_seconds": 20,
+  "attainment": "three complete 20s cohorts at <=.9*paired Default median window P95",
+  "latency_origin": "completed minus emitted; end-to-end including queue and transitions",
+  "note": "No literature estimates, smoothing or invented error bands"
+}

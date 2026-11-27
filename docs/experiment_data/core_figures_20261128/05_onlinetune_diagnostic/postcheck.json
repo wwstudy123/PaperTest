@@ -1,0 +1,60 @@
+{
+  "completed": true,
+  "started_at_utc": "2026-11-27T18:51:10.240669+00:00",
+  "policy": "readonly_checksum_cold_restart_v1",
+  "data_directory_replaced": false,
+  "verification_only": true,
+  "logical_checksums": [
+    [
+      "admtune_workset_v2_full.sbtest1",
+      2186931647
+    ],
+    [
+      "admtune_workset_v2_full.sbtest2",
+      3329598552
+    ],
+    [
+      "admtune_workset_v2_full.sbtest3",
+      979713603
+    ],
+    [
+      "admtune_workset_v2_full.sbtest4",
+      1376345166
+    ]
+  ],
+  "logical_samples_sha256": "f0c867b69133e90ac77e4e34b90d34c966845ae0005916da8dea37c0272d31de",
+  "row_counts": [
+    [
+      2000000,
+      1,
+      2000000
+    ],
+    [
+      2000000,
+      1,
+      2000000
+    ],
+    [
+      2000000,
+      1,
+      2000000
+    ],
+    [
+      2000000,
+      1,
+      2000000
+    ]
+  ],
+  "config_sha256": "fc4c0279d9c6c7ff843b5404a045660d4c835478addbaaf2a040653f82dc40c3",
+  "identity_before": [
+    3308,
+    "/root/autodl-tmp/admtune-mysql-v2/data/",
+    1073741824,
+    200,
+    2000,
+    262144,
+    0
+  ],
+  "llm_calls": 0,
+  "finished_at_utc": "2026-11-27T18:51:21.815389+00:00"
+}

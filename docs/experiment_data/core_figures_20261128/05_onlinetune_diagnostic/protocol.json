@@ -1,0 +1,84 @@
+{
+  "common_dynamic_policy": {
+    "version": "dynamic_matrix_v1",
+    "phase_seconds": 600,
+    "phases": [
+      "A",
+      "B",
+      "A"
+    ],
+    "offered_rate": 10,
+    "query_profile": "range-mixed",
+    "range_rows": 32768,
+    "top_k": 8192,
+    "scan_fractions": [
+      0.9,
+      0.1,
+      0.9
+    ],
+    "neutral_prewarm_seconds": 180,
+    "true_trial_cap": 18,
+    "llm_call_cap": 36,
+    "llm_token_cap": 100000,
+    "measurement_warmup_seconds": 15,
+    "measurement_seconds": 60,
+    "fixed_noise_log_std": 0.02,
+    "max_output_tokens": 1500,
+    "independent_history_start": "empty per run; within-run facts retained unless ablated",
+    "native_dynamic_adapter": "shared observed-change trigger; restart source search per phase; keep accepted config and measured in-run history; no added GP/Reflexion",
+    "attainment": {
+      "reference": ".9 * paired Default median 20-second window P95 per phase",
+      "consecutive_complete_windows": 3,
+      "window_seconds": 20
+    },
+    "primary_metrics": [
+      "continuous end-to-end P95",
+      "actual cumulative successful completions",
+      "first sustained target confirmation from phase start"
+    ],
+    "provider_seed_controlled": false,
+    "pilot_seed_42_not_reused": true
+  },
+  "adapter": {
+    "name": "OnlineTune dynamic adapter",
+    "source_revision": "88ba8c35f554bc4a4f7f1a88257b3e8928f87a39",
+    "context": [
+      "read_share",
+      "write_share",
+      "range_scan_share",
+      "range_sort_share",
+      "point_read_share",
+      "mean_range_fraction",
+      "mean_limit_fraction",
+      "aggregate_fraction",
+      "nested_select_share",
+      "log_offered_rate"
+    ],
+    "encoder": "observed SQL structure, not unavailable pretrained LSTM or future phase labels",
+    "routing": "past windows only; StandardScaler/PCA3/DBSCAN(.7,8), RBF SVM gamma=auto",
+    "novel_context": "provisional region when distance to observed region center exceeds .25",
+    "default_reference": "budgeted measured phase anchor; historical raw utilities recentered on activation",
+    "model_reuse": "region keyed raw observations and upstream GP hyperparameters retained on return",
+    "cross_region_transfer": "objective-only transfer for >10% gains above observed 90th percentile",
+    "objective": "inverse measured P95; original objective-difference and relative-constraint GPs",
+    "llm_calls": 0
+  },
+  "smoke": false,
+  "measurement_seconds": 60,
+  "warmup_seconds": 15,
+  "phase_seconds": 600,
+  "neutral_prewarm_seconds": 180,
+  "python": "3.10.8",
+  "dependencies": {
+    "numpy": "1.26.4",
+    "scipy": "1.12.0",
+    "sqlglot": "27.29.0",
+    "paramiko": "5.1.0",
+    "PyYAML": "6.0.4",
+    "requests": "2.34.2",
+    "PyMySQL": "1.2.4"
+  },
+  "git_revision": "9cf60db274a582a868a2b41af1c2106dfe667bbf",
+  "git_dirty": false,
+  "working_source_sha256": "17c67efe42f886bb20f7cbfb18e4a4af2fb00936c0f078fff371dde69ac12204"
+}

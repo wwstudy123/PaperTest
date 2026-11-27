@@ -1,0 +1,23 @@
+{
+  "scope": "offline diagnosis of original seed43; no new performance measurement",
+  "database_calls": 0,
+  "llm_calls": 0,
+  "a1_target_ms": 59.74725220352409,
+  "first_good_observation_id": "c8e711c69cf94c3a95912dcdbf78b268",
+  "first_good_observation_sealed_at_s": 192,
+  "first_good_observation_p95_ms": 58.308514,
+  "sustained_service_attainment_s": 560,
+  "a1_prescreen_events": 0,
+  "a1_failure_count": 2,
+  "recorded_failed_resize_wait_s": 119.88457663357258,
+  "failed_trial_to_next_start_intervals_s": 202.586706712842,
+  "interval_note": "Includes apply/recovery/computation; not all of it is resize wait.",
+  "a1_selector_pruner_recommender_s": 17.648404985666275,
+  "all_trial_slots": 14,
+  "valid_observations": 12,
+  "source_sha256": {
+    "summary.json": "821c07657653ee809b2658d5f9bb4245c7042e01fe4c374bf316a69772a3a435",
+    "trials.jsonl": "4f09a31bffcbd474e342b165ceed6cd2b3957be57f79a28e9ff15396eddeed28",
+    "requests.jsonl": "501d69e00460e0d5a4db6978c661e694ffc15c478b212cb15b94662061566a8d"
+  }
+}

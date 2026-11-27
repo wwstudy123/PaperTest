@@ -1,0 +1,7 @@
+mode,trigger,input_records,serialized_input_bytes
+incremental,1,6,2577
+incremental,2,6,2016
+incremental,3,2,963
+full,1,6,2577
+full,2,12,4170
+full,3,14,4708

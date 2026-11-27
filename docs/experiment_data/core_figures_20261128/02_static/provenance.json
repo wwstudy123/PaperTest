@@ -1,0 +1,28 @@
+{
+  "real_run_evidence": [
+    {
+      "method": "Default",
+      "source_path": "/root/experiment-results/static-quick-20261127/Default",
+      "manifest_sha256": "b29e297aba70b661da3c7a5cd3df912e5d3e7fa88cc25757c1a90f3086770c12"
+    },
+    {
+      "method": "AgenticDB",
+      "source_path": "/root/experiment-results/static-quick-20261127/AgenticDB",
+      "manifest_sha256": "3b069e9eab7f5aa5279471a9b118b8a43907ea42974003ce330b40984f8c22ef"
+    },
+    {
+      "method": "AgentTune",
+      "source_path": "/root/experiment-results/static-quick-20261127/AgentTune",
+      "manifest_sha256": "28407588341bba5c1032bc72497b267419b4ef3a4e6d8cc00af189a918e43d18"
+    },
+    {
+      "method": "ADMTune",
+      "source_path": "/root/experiment-results/static-quick-20261127/ADMTune",
+      "manifest_sha256": "3ab323bed001c13c23f49f372fdc73d48ed389cb394728d96cdf98efa9ec9db4"
+    }
+  ],
+  "literature_file": null,
+  "literature_sha256": null,
+  "literature_time_rescaled": false,
+  "reference_curves_are_measurements": false
+}

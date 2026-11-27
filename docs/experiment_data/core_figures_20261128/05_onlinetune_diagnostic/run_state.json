@@ -1,0 +1,9 @@
+{
+  "status": "completed",
+  "stage": "completed",
+  "seed": 43,
+  "smoke": false,
+  "started_at_utc": "2026-11-27T18:17:29.888415+00:00",
+  "llm_calls": 0,
+  "finished_at_utc": "2026-11-27T18:51:21.896526+00:00"
+}

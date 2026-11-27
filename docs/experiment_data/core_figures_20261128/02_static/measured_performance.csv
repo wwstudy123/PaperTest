@@ -1,0 +1,5 @@
+method,source_type,repeat,true_measurements,llm_calls,llm_tokens,tps,p95_latency_ms,objective_tps_over_p95,objective_gain_vs_default_pct,reported_value
+Default,measured,1,3,0,0,2435.92,18.28,133.256018,0.0,three-measurement median
+AgenticDB (DB-only),measured,1,7,5,30103,2486.47,17.63,141.036302,5.8385985989765965,independent final measurement
+AgentTune,measured,1,8,20,52144,2455.49,17.95,136.7961,2.6566019705016153,independent final measurement
+ADMTune,measured,1,7,5,10565,2473.74,17.01,145.428571,9.13471164957067,independent final measurement
