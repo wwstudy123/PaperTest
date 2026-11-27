@@ -14,6 +14,7 @@ from admtune.replay_report import write_csv
 
 STYLE = {"ADMTune": ("#d62728", "s"), "AgenticDB": ("#1f77b4", "o"),
          "AgentTune": ("#ff7f0e", "^"), "Default": ("#777777", None),
+         "OnlineTune": ("#2ca02c", "D"),
          "GPTuner": ("#9467bd", "D"), "CDBTune": ("#2ca02c", "v")}
 
 

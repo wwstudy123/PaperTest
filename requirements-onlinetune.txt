@@ -1,0 +1,5 @@
+# 独立Python3.10环境；不修改既有四方法运行环境，不安装TensorFlow。
+# 另安装本项目[replay,plots]依赖；以下为原GPy核心的兼容组合。
+numpy==1.26.4
+scipy==1.12.0
+GPy==1.13.2
