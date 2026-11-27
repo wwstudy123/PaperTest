@@ -1,0 +1,32 @@
+# 原生事务负载；执行器优化TPS/P95，原始TPS和P95分别留档。
+workload:
+  kind: sysbench
+  mode: read
+  command_template: null
+  script_path: /usr/share/sysbench/oltp_read_only.lua
+  db_driver: mysql
+  workload_script: oltp_read_only.lua
+  tables: 4
+  table_size: 2000000
+  threads: 32
+  duration: 60
+  warmup_time: 15
+  report_interval: 5
+  database: admtune_workset_v2_full
+  host: null
+  port: null
+  output_path: null
+  env: {}
+  prompt_files: []
+  rand_seed: 42
+  rand_type: uniform
+objective:
+  primary_metric: tps
+  direction: maximize
+  formula: tps
+  latency_metric: p95_latency_ms
+  min_improvement_ratio: 0.01
+metrics:
+  db_metrics_whitelist_path: null
+  max_metrics: 64
+  include_parameter_metadata: true

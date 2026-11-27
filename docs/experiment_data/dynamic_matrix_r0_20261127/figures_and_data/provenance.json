@@ -1,0 +1,27 @@
+{
+  "seed": 43,
+  "independent_repetitions": 1,
+  "sources": {
+    "Default": {
+      "requests_sha256": "3fcfc531dd25a51c8a4086bad11d249dc35aa7b859b33722f9aa0cf0c7ce1093",
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5"
+    },
+    "AgenticDB": {
+      "requests_sha256": "52daba5b16f09314f720ab2a0df37cdad05d44a08683934f6a74fd4c5a53ef56",
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5"
+    },
+    "AgentTune": {
+      "requests_sha256": "668f6158947ca1aed350a35f86dd1b581258fae9ed678b820239f8a7c630138b",
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5"
+    },
+    "ADMTune": {
+      "requests_sha256": "501d69e00460e0d5a4db6978c661e694ffc15c478b212cb15b94662061566a8d",
+      "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5"
+    }
+  },
+  "all_requests_included": true,
+  "window_seconds": 20,
+  "attainment": "three complete 20s cohorts at <=.9*paired Default median window P95",
+  "latency_origin": "completed minus emitted; end-to-end including queue and transitions",
+  "note": "No literature estimates, smoothing or invented error bands"
+}
