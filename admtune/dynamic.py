@@ -136,6 +136,7 @@ class DynamicSession:
         self.fixed_noise_log_std = fixed_noise_log_std
         self.max_output_tokens = max_output_tokens
         self.method, self.ablation = "ADMTune", "full"
+        self.onlinetune_source = None
         self.telemetry = LiveTelemetry(PhaseFence(window_seconds=plan.window_seconds))
         self.thread = None
         self.error = None
@@ -200,7 +201,9 @@ class DynamicSession:
         try:
             store = Store(self.output / 'records.sqlite3')
             self.store = store
-            if self.backend_kind == 'llm':
+            if self.method == "OnlineTune":
+                backend = None
+            elif self.backend_kind == 'llm':
                 llm = LLMClient.from_env(dry_run=False)
                 llm.allow_fallback = False
                 backend = AgenticDBBackend(llm, ledger, max_output_tokens=self.max_output_tokens,
@@ -212,8 +215,8 @@ class DynamicSession:
             controller_kwargs = dict(
                 space=self.space, environment=self.environment, objective=Objective('p95_latency_ms', 'minimize'),
                 detector=DetectorView(self.telemetry), executor=executor,
-                team=PooledTeam(self.space, backend, batch_size=6, max_selected=4),
-                reflector=Reflector(store, EvidenceWireBackend(
+                team=None if self.method == "OnlineTune" else PooledTeam(self.space, backend, batch_size=6, max_selected=4),
+                reflector=None if self.method == "OnlineTune" else Reflector(store, EvidenceWireBackend(
                     backend, audit_dir=self.output / 'reflection_maps',
                 ), max_batch=12, old_summary_limit=0), store=store,
                 ledger=ledger, policy=Policy(max_batches=1, max_replans=0, tolerated_drop=.2,
@@ -225,6 +228,11 @@ class DynamicSession:
             if self.method == "ADMTune":
                 controller = BatchedController(**controller_kwargs)
                 controller.reflection_enabled = self.ablation != "no_reflection"
+            elif self.method == "OnlineTune":
+                from .onlinetune_dynamic import OnlineTuneDynamicController
+                controller = OnlineTuneDynamicController(telemetry=self.telemetry,
+                    upstream=self.onlinetune_source, output=self.output,
+                    table_size=self.plan.table_size, **controller_kwargs)
             else:
                 from .native_dynamic import NativeDynamicController, PhaseBudgetLLM
                 def available():
@@ -347,6 +355,15 @@ class DynamicSession:
                 }
                 if self.error:
                     self.result.update(closed_loop_completed=False, control_flow_completed=False)
+                if self.method == "OnlineTune" and getattr(self, "control", None):
+                    strategy = self.control.strategy
+                    self.result["onlinetune_dynamic"] = {
+                        "regions": len(strategy.bank), "svm_fits": strategy.router.svm_fits,
+                        "model_reuse_events": sum(k == "onlinetune_region_activated"
+                                                 and p.get("reused_model", False) for k, p in events),
+                        "active_context": strategy.context.tolist(),
+                        "actual_encoder": "observed SQL structure, not pretrained LSTM",
+                    }
                 (self.output / 'dynamic_summary.json').write_text(json.dumps(self.result, ensure_ascii=False, indent=2))
                 self._export_trials(records)
                 store.close()
@@ -356,6 +373,9 @@ class DynamicSession:
                 columns = ['timestamp', 'operation', 'model', 'duration_s', 'input_tokens', 'output_tokens', 'total_tokens', 'cached_tokens']
                 write_csv(self.output / 'llm_usage.csv',
                           [{k: r.get(k) for k in columns} for r in usage.get('records', [])], columns)
+            elif self.method == "OnlineTune":
+                (self.output / "llm_usage.json").write_text(json.dumps({
+                    "model": None, "calls": 0, "total_tokens": 0, "records": [], "budget": ledger.snapshot()}))
             if self.result is None:
                 self.result = {'error': self.error or 'Worker stopped before initialization', 'closed_loop_completed': False}
                 (self.output / 'dynamic_summary.json').write_text(json.dumps(self.result, indent=2))
@@ -401,7 +421,7 @@ def main():
     parser.add_argument('--env-file', type=Path, default=Path('.env'))
     parser.add_argument('--dedicated-instance', action='store_true')
     parser.add_argument('--allow-paid-llm', action='store_true')
-    parser.add_argument('--backend', choices=['heuristic', 'llm'], default='heuristic')
+    parser.add_argument('--backend', choices=['heuristic', 'llm', 'onlinetune'], default='heuristic')
     parser.add_argument('--smoke', action='store_true', help='短时软件链路验收，不是正式协议')
     parser.add_argument('--phase-seconds', type=int, default=600)
     parser.add_argument('--warmup-seconds', type=int, default=15)
@@ -413,7 +433,8 @@ def main():
     parser.add_argument('--range-rows', type=int, default=0)
     parser.add_argument('--top-k', type=int, default=0)
     parser.add_argument('--fixed-noise-log-std', type=float, default=0.0)
-    parser.add_argument('--method', choices=["ADMTune", "AgenticDB", "AgentTune"], default="ADMTune")
+    parser.add_argument('--method', choices=["ADMTune", "AgenticDB", "AgentTune", "OnlineTune"], default="ADMTune")
+    parser.add_argument('--onlinetune-source', type=Path)
     parser.add_argument('--ablation', choices=["full", "single_slice", "no_history", "no_gp", "no_reflection"],
                         default="full")
     parser.add_argument('--formal', action='store_true', help='冻结协议矩阵：共同上限36次API/120000token')
@@ -427,14 +448,21 @@ def main():
         parser.error('Dedicated recoverable experimental instance required')
     if args.backend == 'llm' and not args.allow_paid_llm:
         parser.error('Explicit paid LLM authorization required')
+    if args.method == "OnlineTune":
+        if (args.backend != "onlinetune" or args.ablation != "full"
+                or args.onlinetune_source is None or not args.onlinetune_source.is_dir()):
+            parser.error("OnlineTune requires its dedicated backend, pinned source and no ADMTune ablations")
+        args.llm_calls = args.llm_tokens = 0
+    elif args.backend == "onlinetune":
+        parser.error("OnlineTune backend cannot be relabelled as another method")
     call_cap, token_cap = (36, 120000) if args.formal else (12, 20000)
     if not 0 <= args.llm_calls <= call_cap or not 0 <= args.llm_tokens <= token_cap:
         parser.error(f'Cap: {call_cap} API calls and {token_cap} tokens')
-    if args.formal and (args.backend != "llm" or args.smoke):
-        parser.error("Formal matrix requires actual LLM and full measurement timing")
+    if args.formal and (args.backend not in {"llm", "onlinetune"} or args.smoke):
+        parser.error("Formal matrix requires an actual method backend and full measurement timing")
     if not 1 <= args.max_output_tokens <= (1500 if args.formal else 1024):
         parser.error("Output cap: pilot 1024, formal 1500")
-    if args.method != "ADMTune" and (args.backend != "llm" or args.ablation != "full"):
+    if args.method in {"AgenticDB", "AgentTune"} and (args.backend != "llm" or args.ablation != "full"):
         parser.error("Native baselines require actual LLM and cannot be relabelled ablations")
     if not args.smoke and (args.warmup_seconds < 15 or args.measurement_seconds < 60):
         parser.error('Shorter timing requires --smoke and must not be reported as calibrated or formal')
@@ -499,12 +527,16 @@ def main():
                     'llm_token_limit': args.llm_tokens,
                     'max_output_tokens': args.max_output_tokens,
                     **source_provenance()}
+        if args.method == "OnlineTune":
+            from .onlinetune_dynamic import DYNAMIC_ADAPTATION
+            manifest["onlinetune_adapter"] = DYNAMIC_ADAPTATION
         (args.output / 'manifest.json').write_text(json.dumps(manifest, indent=2))
         session = DynamicSession(actuator, client, space, environment, args.output, plan, timing,
                                  backend_kind=args.backend, seed=args.seed, llm_calls=args.llm_calls,
                                  llm_tokens=args.llm_tokens, fixed_noise_log_std=args.fixed_noise_log_std)
         session.max_output_tokens = args.max_output_tokens
         session.method, session.ablation = args.method, args.ablation
+        session.onlinetune_source = args.onlinetune_source
         # 即使主线程无法及时停止控制线程，也不能提前释放实例锁。
         session.instance_lock = lock
         result = replay(plan, client, args.output, simulated=False, observer=session)

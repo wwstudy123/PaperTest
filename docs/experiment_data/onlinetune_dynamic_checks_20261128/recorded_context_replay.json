@@ -1,0 +1,105 @@
+{
+  "check": "offline context routing on real recorded arrivals; not OnlineTune performance",
+  "database_calls": 0,
+  "llm_calls": 0,
+  "source_sha256": "3ab8398dd21cedb3abefb93b3cadae2d96b4a422b9a7149d4e5972746ff853b4",
+  "encoder": [
+    "read_share",
+    "write_share",
+    "range_scan_share",
+    "range_sort_share",
+    "point_read_share",
+    "mean_range_fraction",
+    "mean_limit_fraction",
+    "aggregate_fraction",
+    "nested_select_share",
+    "log_offered_rate"
+  ],
+  "routes": [
+    {
+      "observed_until_s": 32,
+      "window_count": 8,
+      "region": 0,
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666668,
+        0.1,
+        0.34708067508455476
+      ]
+    },
+    {
+      "observed_until_s": 632,
+      "window_count": 158,
+      "region": 1,
+      "context": [
+        1.0,
+        0.0,
+        0.1,
+        0.9,
+        0.0,
+        0.016384,
+        0.225,
+        0.7,
+        0.9,
+        0.34708067508455476
+      ]
+    },
+    {
+      "observed_until_s": 1232,
+      "window_count": 308,
+      "region": 0,
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666666,
+        0.1,
+        0.34708067508455476
+      ]
+    }
+  ],
+  "router": {
+    "centers": {
+      "0": [
+        1.0,
+        0.0,
+        0.9000000000000026,
+        0.09999999999999974,
+        0.0,
+        0.016383999999999965,
+        0.024999999999999935,
+        0.966666666666668,
+        0.09999999999999974,
+        0.3470806750845553
+      ],
+      "1": [
+        1.0,
+        0.0,
+        0.09999999999999976,
+        0.9000000000000025,
+        0.0,
+        0.016383999999999965,
+        0.22500000000000062,
+        0.7000000000000018,
+        0.9000000000000025,
+        0.34708067508455526
+      ]
+    },
+    "windows": 308,
+    "svm_fits": 2,
+    "dbscan_label_to_region": {
+      "0": 0,
+      "1": 1
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "same_full_table_checksums": true,
+  "same_sample_hash": true,
+  "same_initial_config_hash": true,
+  "same_recorded_hardware": true,
+  "recorded_hardware": {
+    "cpu_model": "Intel(R) Xeon(R) Silver 4214R CPU @ 2.40GHz",
+    "visible_cpu_count": 48,
+    "cgroup_limits": {
+      "/sys/fs/cgroup/cpu/cpu.cfs_quota_us": "1200000",
+      "/sys/fs/cgroup/cpu/cpu.cfs_period_us": "100000",
+      "/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_quota_us": "1200000",
+      "/sys/fs/cgroup/cpu,cpuacct/cpu.cfs_period_us": "100000",
+      "/sys/fs/cgroup/memory/memory.limit_in_bytes": "96636764160"
+    }
+  },
+  "actual_old_instance": "autodl-container-aa6147b8a1-c2c6efb0",
+  "actual_new_instance": "autodl-container-77c34b852e-98bb92e3",
+  "source_sha256": {
+    "runs/dynamic-matrix-r0-20261127/dynamic-matrix-r0-20261127/seed-43/Default-postcheck.json": "627cad10a9b00b253c5b8c06cad0d5d65cc776f68b7030513b02dedd245606e9",
+    "runs/static-quick-20261127/static-quick-20261127/Default-postcheck.json": "d2358eba72cfa556ecb61bfe6748cea637b992b80c254f63622c0345b4bffd2f",
+    "runs/formal-baselines/results-20261126/admtune-formal-tune-adm-r0-20261126/ADMTune/manifest.json": "c0a576005384c8dbae1db69cdc2a74751c5f6f654798b53ec4f5405742f61b85",
+    "runs/static-quick-20261127/static-quick-20261127/ADMTune/manifest.json": "3ab323bed001c13c23f49f372fdc73d48ed389cb394728d96cdf98efa9ec9db4"
+  }
+}

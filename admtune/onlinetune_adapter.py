@@ -97,7 +97,7 @@ class LinearCatalog:
 
 
 class StaticRegion:
-    """静态单上下文的历史接口；不假装执行过动态聚类或离线历史训练。"""
+    """区域内事实接口；静态单区或动态路由由上层负责，不冒充离线训练。"""
     current_id = 0
     def __init__(self, output, event):
         self.output, self.event, self.history = output, event, []
@@ -114,7 +114,7 @@ class StaticRegion:
 
     def get_important_knobs(self, label):
         self.event("onlinetune_original_direction_fallback",
-                   {"reason": "static adapter without offline fANOVA; upstream fallback to random direction"})
+                   {"reason": "adapter without offline fANOVA; upstream fallback to random direction"})
         return False, None
 
 
@@ -158,7 +158,7 @@ class OnlineTuneStrategy:
         algo = self.core.SafetyMixin()
         algo.initialize(domain=domain, domain_all=all_domain, x0=self.codec.encode(self.initial),
                         num_constraints=1, initial_data=[], parameter_names=self.space.names)
-        algo.cluster = StaticRegion(self.output, self.event)
+        algo.cluster = self.make_region_history()
         algo.default_x = self.codec.encode(self.initial)
         algo.best_y, algo.context_change = 0, True
         algo.knobL, algo.ydeltaL, algo.xL, algo.knob_modelL = [], [], [], []
@@ -170,6 +170,9 @@ class OnlineTuneStrategy:
             raise ValueError("Upstream initial point differs from the measured baseline")
         self.pending = (x, additional)
 
+    def make_region_history(self):
+        return StaticRegion(self.output, self.event)
+
     def propose(self, records, incumbent):
         if self.algorithm is None:
             raise ValueError("Real baseline observation required before OnlineTune proposal")
@@ -177,10 +180,18 @@ class OnlineTuneStrategy:
         cfg = self.codec.decode(x)
         self.pending = (np.r_[self.codec.encode(cfg), self.context], additional)
         a = self.algorithm
+        point = self.pending[0]
+        mean, variance = a.model.mean_var(point)
+        safety_mean, safety_variance = a.s[0].mean_var(point)
         decision = {"rule": "upstream_OnlineTune_SafetyMixin", "source_phase": a._phase,
                     "additional_data": {k: str(v) for k, v in additional.items()},
                     "novel_configuration": cfg not in [r["config"] for r in records],
-                    "objective_beta": float(a.model.beta), "constraint_beta": float(a.s[0].beta)}
+                    "objective_beta": float(a.model.beta), "constraint_beta": float(a.s[0].beta),
+                    "measured_anchor": float(self.baseline),
+                    "objective_delta_mean": float(np.asarray(mean).item()),
+                    "objective_delta_std": float(np.sqrt(np.asarray(variance).item())),
+                    "relative_constraint_mean": float(np.asarray(safety_mean).item()),
+                    "relative_constraint_std": float(np.sqrt(np.asarray(safety_variance).item()))}
         self.event("onlinetune_selection", decision)
         # 重复也占真实预算；不能把原算法回到中心的决策换成随机新配置。
         return cfg, "candidate", decision
@@ -211,9 +222,10 @@ class OnlineTuneStrategy:
         a.xL.append(x[:len(self.space.names)])
         a.s[0].x_added, a.s[0].y_added = x, relative
         previous = len(a.model.gp.X)
+        previous_constraint = len(a.s[0].gp.X)
         is_new = record["config"] not in a.knob_modelL
         a.add_data(data)
-        if is_new and (len(a.model.gp.X) <= previous or len(a.s[0].gp.X) <= previous):
+        if is_new and (len(a.model.gp.X) <= previous or len(a.s[0].gp.X) <= previous_constraint):
             raise RuntimeError("Upstream GP training failed; no unreported fallback allowed")
         self.pending = None
         self.event("onlinetune_model_updated", {

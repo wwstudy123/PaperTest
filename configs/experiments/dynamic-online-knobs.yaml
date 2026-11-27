@@ -1,0 +1,45 @@
+# 沿用动态种子43共同四参数目录，不包含其他方法的性能标签。
+innodb_buffer_pool_size:
+  type: integer
+  default: 1073741824
+  min: 536870912
+  max: 4294967296
+  step: 134217728
+  special_values: []
+  log_scale: true
+  restart_required: false
+  unit: bytes
+  description: ''
+innodb_io_capacity:
+  type: integer
+  default: 200
+  min: 100
+  max: 2000
+  step: 100
+  special_values: []
+  log_scale: false
+  restart_required: false
+  unit: null
+  description: ''
+innodb_io_capacity_max:
+  type: integer
+  default: 2000
+  min: 2000
+  max: 6000
+  step: 500
+  special_values: []
+  log_scale: false
+  restart_required: false
+  unit: null
+  description: ''
+sort_buffer_size:
+  type: integer
+  default: 262144
+  min: 262144
+  max: 8388608
+  step: 262144
+  special_values: []
+  log_scale: true
+  restart_required: false
+  unit: bytes
+  description: ''
