@@ -1,0 +1,50 @@
+{
+  "status": "completed",
+  "policy": {
+    "version": "formal_db_baselines_v1",
+    "objective": "tps_per_p95:maximize",
+    "trials": 8,
+    "wall_seconds": 1500,
+    "llm_calls": 20,
+    "llm_tokens": 64000,
+    "default_measurements": 3,
+    "workload_seed": 42,
+    "workload": "native_read_only_uniform_32_15plus60",
+    "reset": "full_logical_checksum_and_cold_restart_no_buffer_pool_load",
+    "historical_observations_imported": 0,
+    "label_decimals": 6,
+    "agenttune": {
+      "top_k": 2,
+      "node_count": 3,
+      "history_num": 5,
+      "selector_temperature": 0,
+      "pruner_temperature": 0,
+      "recommender_temperature": 1,
+      "top_p": 0.98
+    },
+    "agenticdb": {
+      "db_only": true,
+      "acceptance_min_gain": 0.01
+    },
+    "admtune": {
+      "gp_policy": "repeat-aware",
+      "initial_noise_repeats": 0
+    },
+    "provider_seed": null
+  },
+  "repeat": 1,
+  "methods": [
+    "Default",
+    "AgenticDB",
+    "AgentTune",
+    "ADMTune"
+  ],
+  "started_at_utc": "2026-11-27T15:22:53.460567+00:00",
+  "finished_methods": [
+    "Default",
+    "AgenticDB",
+    "AgentTune",
+    "ADMTune"
+  ],
+  "finished_at_utc": "2026-11-27T16:01:31.037076+00:00"
+}

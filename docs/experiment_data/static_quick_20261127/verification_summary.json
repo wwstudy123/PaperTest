@@ -1,0 +1,51 @@
+{
+  "archive_sha256": "74f620419c0dc6a6a28d3f860f9e62872b59be6db5c027d0e62eedd0e8213fa4",
+  "source_revision": "2d3704795ca86c56dd452bf780a8a49979b80227",
+  "hardware_instance": "autodl-container-77c34b852e-98bb92e3",
+  "single_run": true,
+  "methods": [
+    {
+      "method": "Default",
+      "status": "completed",
+      "llm_calls": 0,
+      "tokens": 0,
+      "valid_measurements": 3,
+      "final_vs_own_baseline_pct": 0.27410346857550394,
+      "configuration_restored": true,
+      "postcheck": true
+    },
+    {
+      "method": "AgenticDB",
+      "status": "completed",
+      "llm_calls": 5,
+      "tokens": 30103,
+      "valid_measurements": 7,
+      "final_vs_own_baseline_pct": 10.612278622099103,
+      "configuration_restored": true,
+      "postcheck": true
+    },
+    {
+      "method": "AgentTune",
+      "status": "completed",
+      "llm_calls": 20,
+      "tokens": 52144,
+      "valid_measurements": 8,
+      "final_vs_own_baseline_pct": 2.632586644723478,
+      "configuration_restored": true,
+      "postcheck": true
+    },
+    {
+      "method": "ADMTune",
+      "status": "completed",
+      "llm_calls": 5,
+      "tokens": 10565,
+      "valid_measurements": 7,
+      "final_vs_own_baseline_pct": 5.5133651116234805,
+      "configuration_restored": true,
+      "postcheck": true
+    }
+  ],
+  "total_measurements": 25,
+  "total_llm_calls": 30,
+  "total_tokens": 92812
+}

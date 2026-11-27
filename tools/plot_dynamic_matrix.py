@@ -12,7 +12,7 @@ from tools.analyze_dynamic_stage1 import adaptation
 
 METHODS = ("Default", "AgenticDB", "AgentTune", "ADMTune")
 PHASES = ("A1", "B", "A2")
-COLORS = ("#777777", "#1f77b4", "#2ca02c", "#d62728")
+COLORS = ("#777777", "#1f77b4", "#ff7f0e", "#d62728")
 
 
 def service_metrics(records):
