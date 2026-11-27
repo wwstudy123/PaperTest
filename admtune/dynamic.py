@@ -81,28 +81,35 @@ def completion_checks(phases, records, events, *, require_gp=True, require_refle
 
 
 class PooledTeam(Team):
-    """每阶段一批候选，实际逐个测量和更新 GP；不是复用预先给定最优答案。"""
-    def initialize(self, context, experiences, *, diagnostics=None):
-        self.pool = None
-        # GP refusal thresholds belong to the preceding phase/model. Compatible
-        # observations remain available through retrieval, not stale feedback.
-        self.feedback = {}
+    """同一阶段/父配置复用一批候选；父配置变更时重新生成，不沿用旧绝对配置。"""
+    @staticmethod
+    def compact_experiences(experiences):
         measured = [x for x in experiences if x.get('type') == 'measurement'][:1]
         summaries = [
             {
                 **{k: x[k] for k in ['type', 'conditions', 'evidence_ids'] if k in x},
                 'hypothesis_previews': [
-                    {'text': str(h)[:160], 'truncated': len(str(h)) > 160}
+                    {'text': str(h)[:160], 'truncated': len(str(h)) > 160, 'unverified': True}
                     for h in x.get('hypotheses', [])[:2]
                 ],
             }
             for x in experiences if x.get('type') == 'reflection'
         ][-1:]
-        super().initialize(context, measured + summaries, diagnostics=diagnostics)
+        return measured + summaries
+
+    def initialize(self, context, experiences, *, diagnostics=None):
+        self.pool = None
+        self.pool_parent = None
+        # GP refusal thresholds belong to the preceding phase/model. Compatible
+        # observations remain available through retrieval, not stale feedback.
+        self.feedback = {}
+        super().initialize(context, self.compact_experiences(experiences), diagnostics=diagnostics)
 
     def recommend(self, parent, phase_id, context, experiences):
-        if self.pool is None:
-            self.pool = super().recommend(parent, phase_id, context, experiences[:1])
+        parent_key = (phase_id, fingerprint(parent), fingerprint(getattr(self, "ranges", {})))
+        if self.pool is None or self.pool_parent != parent_key:
+            self.pool = super().recommend(parent, phase_id, context, self.compact_experiences(experiences))
+            self.pool_parent = parent_key
         return list(self.pool)
 
 

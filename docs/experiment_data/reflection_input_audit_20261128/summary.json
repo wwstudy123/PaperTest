@@ -1,0 +1,17 @@
+{
+  "scope": "input-selection audit using real old observations; output text is mocked and unused",
+  "actual_llm_calls": 0,
+  "database_calls": 0,
+  "real_observation_records": 14,
+  "note": "Bytes/record appearances are not actual tokens, reflection quality or DB performance.",
+  "totals": {
+    "incremental": {
+      "record_appearances": 14,
+      "input_bytes": 5556
+    },
+    "full": {
+      "record_appearances": 32,
+      "input_bytes": 11455
+    }
+  }
+}

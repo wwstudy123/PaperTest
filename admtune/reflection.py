@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .agents import Backend
 from .memory import Store
+from .security import redact
 
 
 class Reflector:
@@ -42,11 +43,18 @@ class Reflector:
             "facts": facts,
             "conditions": {"environment_key": environment, "objective_key": objective},
             "events": sorted(set(events)),
+            "interpretation_rules": [
+                "Hypotheses are unverified explanations, not observed causal facts.",
+                "constraints_ok=false on an incomplete/failed observation does not prove a violated knob bound; consult failure_reason.",
+            ],
             "old_summaries": old_summaries[-self.old_summary_limit:]
             if self.mode == "incremental" and self.old_summary_limit else [],
             "record_context": [
                 {"trial_id": t.trial_id, "config": t.config, "phase_id": t.phase_id,
                  "kind": t.metadata.get("kind"), "constraints_ok": t.constraints_ok}
+                | ({"measurement_complete": t.complete, "measurement_effective": t.effective,
+                    "failure_reason": redact(str(t.metadata.get("reason", "not supplied")))[:500]}
+                   if not t.trainable else {})
                 | ({"raw_tps": t.metadata["raw_tps"], "p95_latency_ms": t.metadata.get("p95_latency_ms"),
                     "label_precision_decimals": t.metadata.get("label_precision_decimals"),
                     "measured_telemetry": {

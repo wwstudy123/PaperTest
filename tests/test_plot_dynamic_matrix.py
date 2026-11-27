@@ -1,6 +1,9 @@
 import unittest
+import json
+from pathlib import Path
+import tempfile
 
-from tools.plot_dynamic_matrix import service_metrics
+from tools.plot_dynamic_matrix import service_metrics, collect
 
 
 class DynamicPlotTests(unittest.TestCase):
@@ -38,3 +41,17 @@ class DynamicPlotTests(unittest.TestCase):
         rs[0]["scheduled"] = 21
         with self.assertRaisesRegex(ValueError, "cohort"):
             service_metrics(rs)
+
+    def test_static_or_smoke_online_tune_cannot_become_dynamic_curve(self):
+        for manifest in [
+            {"method": "OnlineTune", "smoke": True, "formal_protocol": False, "backend": "onlinetune"},
+            {"method": "OnlineTune", "smoke": False, "formal_protocol": False, "backend": "llm"},
+        ]:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                batch, extra = root / "batch", root / "extra"
+                batch.mkdir(); extra.mkdir()
+                (batch / "matrix.json").write_text('{"status":"completed"}')
+                (extra / "manifest.json").write_text(json.dumps(manifest))
+                with self.assertRaisesRegex(ValueError, "formal dynamic"):
+                    collect(batch, 43, [extra])

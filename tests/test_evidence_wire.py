@@ -13,6 +13,26 @@ from admtune.reflection import Reflector
 
 
 class EvidenceWireTests(unittest.TestCase):
+    def test_reflection_keeps_execution_failure_distinct_from_knob_violation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store = Store(Path(folder) / "evidence.sqlite3")
+            fixture = HeuristicBackend()
+            delegate = Mock()
+            delegate.complete.side_effect = fixture.complete
+            try:
+                store.append(Trial("failed", "p1", "env", "p95_latency_ms:minimize", {"x": 1}, [0],
+                                   "execution_failed", metadata={"reason": "Buffer-pool resize did not settle",
+                                                                "kind": "startup"}))
+                reflector = Reflector(store, delegate, old_summary_limit=0)
+                self.assertTrue(reflector.trigger(["phase_end"], force=True))
+                payload = delegate.complete.call_args.args[1]
+                self.assertIn("Buffer-pool resize", payload["record_context"][0]["failure_reason"])
+                self.assertFalse(payload["record_context"][0]["measurement_complete"])
+                self.assertTrue(any("does not prove" in x for x in payload["interpretation_rules"]))
+                self.assertIsNone(payload["facts"][0]["value"])
+            finally:
+                store.close()
+
     def payload(self):
         return {
             "facts": [{"trial_id": "long-real-id-1", "status": "measured", "value": 2.35},
