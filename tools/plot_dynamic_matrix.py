@@ -15,6 +15,14 @@ PHASES = ("A1", "B", "A2")
 COLORS = ("#777777", "#1f77b4", "#ff7f0e", "#d62728")
 
 
+def configuration_counts(trials, fixed_default=False):
+    attempted = {json.dumps(r["config"], sort_keys=True) for r in trials}
+    measured = {json.dumps(r["config"], sort_keys=True) for r in trials
+                if r["status"] == "measured" and r["complete"] and r["effective"]}
+    return {"unique_measured_configurations": 1 if fixed_default else len(measured),
+            "unique_attempted_configurations": 1 if fixed_default else len(attempted)}
+
+
 def service_metrics(records):
     """不以调优观测窗口代替服务全过程，不把窗口分位数平均成全程分位数。"""
     if len(records) != 18000 or len({r["seq"] for r in records}) != 18000:
@@ -87,7 +95,10 @@ def collect(batch, seed, extra_runs=()):
         raw = root / "requests.jsonl"
         metrics, ws, ps, cs = service_metrics(read_jsonl(raw))
         usage = json.loads((root / "llm_usage.json").read_text()) if method != "Default" else {}
+        trials_path = root / "trials.jsonl"
+        trials = read_jsonl(trials_path) if trials_path.exists() else []
         rows.append({"method": method, **metrics, "valid_observations": s.get("valid_observations", 0),
+                     **configuration_counts(trials, fixed_default=method == "Default"),
                      "trial_slots_used": s.get("budget", {}).get("trial_slots_used", 0),
                      "failed_config_observations": sum(v for k, v in s.get("trial_statuses", {}).items()
                                                        if k != "measured"),
@@ -125,6 +136,9 @@ def plot(batch, output, seed=43, extra_runs=()):
 
     rows, windows, phases, completions, attainments, sources = collect(batch, seed, extra_runs)
     methods = tuple(r["method"] for r in rows)
+    display = {m: m for m in methods}
+    if "OnlineTune" in methods:
+        display["OnlineTune"] = "OnlineTune (cold-start adapter)"
     colors = (*COLORS, "#2ca02c")[:len(methods)]
     width = .75 / len(methods)
     output.mkdir(parents=True, exist_ok=False)
@@ -146,7 +160,10 @@ def plot(batch, output, seed=43, extra_runs=()):
         fig.tight_layout(rect=(0, .10 if "OnlineTune" in methods else .065, 1, top))
         note = f"Paired request seed {seed}; one run per method."
         if "OnlineTune" in methods:
-            note += "\nOnlineTune: dynamic adapter with observed SQL features."
+            online = next(r for r in rows if r["method"] == "OnlineTune")
+            note += ("\nOnlineTune: cold-start dynamic adapter; only one configuration measured."
+                     if online["unique_measured_configurations"] == 1
+                     else "\nOnlineTune: dynamic adapter with observed SQL features.")
         fig.text(.5, .015, note, ha="center", fontsize=8)
         for ext in ("png", "pdf"):
             fig.savefig(output / f"{name}.{ext}", dpi=280, bbox_inches="tight")
@@ -156,7 +173,7 @@ def plot(batch, output, seed=43, extra_runs=()):
     for index, (method, color) in enumerate(zip(methods, colors)):
         ws = [w for w in windows if w["method"] == method]
         axes[0].plot([w["end_s"] / 60 for w in ws], [w["p95_ms"] for w in ws],
-                     color=color, lw=1.2, ls="--" if method == "Default" else "-", label=method)
+                     color=color, lw=1.2, ls="--" if method == "Default" else "-", label=display[method])
         ps = [p for p in phases if p["method"] == method]
         axes[1].bar(np.arange(3) + (index - (len(methods) - 1) / 2) * width,
                     [p["p95_ms"] for p in ps], width=width * .95, color=color, label=method)
@@ -195,7 +212,7 @@ def plot(batch, output, seed=43, extra_runs=()):
                        label=method if i == 0 else None)
     ax.set(xticks=range(3), xticklabels=PHASES, xlim=(-.55, 2.55), ylim=(0, 660),
            ylabel="Target confirmation time (s)", title="First sustained target attainment")
-    ax.legend(handles=[Patch(color=c, label=m) for m, c in zip(methods, colors)],
+    ax.legend(handles=[Patch(color=c, label=display[m]) for m, c in zip(methods, colors)],
               frameon=False, fontsize=8, ncol=2)
     save(fig, "adaptation")
     return rows

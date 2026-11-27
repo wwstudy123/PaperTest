@@ -1,0 +1,1245 @@
+[
+  {
+    "kind": "onlinetune_context_clusters",
+    "payload": {
+      "centers": {
+        "0": [
+          1.0,
+          0.0,
+          0.8999999999999998,
+          0.10000000000000003,
+          0.0,
+          0.016384000000000006,
+          0.02500000000000001,
+          0.9666666666666665,
+          0.10000000000000003,
+          0.3470806750845546
+        ]
+      },
+      "dbscan_label_to_region": {
+        "0": 0
+      },
+      "svm_fits": 0,
+      "windows": 23
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "tr",
+      "relative_gain": 0.0,
+      "trial_id": "41af09e70bfe460da58d00338b1bb709",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_region_activated",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666666,
+        0.1,
+        0.34708067508455476
+      ],
+      "measured_anchor": 0.014708567748067534,
+      "phase_id": "phase-1",
+      "region": 0,
+      "retained_ids": [
+        "41af09e70bfe460da58d00338b1bb709"
+      ],
+      "reused_model": false,
+      "routing": {
+        "centers": {
+          "0": [
+            1.0,
+            0.0,
+            0.8999999999999998,
+            0.10000000000000003,
+            0.0,
+            0.016384000000000006,
+            0.02500000000000001,
+            0.9666666666666665,
+            0.10000000000000003,
+            0.3470806750845546
+          ]
+        },
+        "dbscan_label_to_region": {
+          "0": 0
+        },
+        "svm_fits": 0,
+        "windows": 23
+      }
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "1",
+        "point_type": "trbest",
+        "t": "1"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.014708567748067534,
+      "novel_configuration": false,
+      "objective_beta": 0.05,
+      "objective_delta_mean": 0.0,
+      "objective_delta_std": 3.7765834492638134e-07,
+      "relative_constraint_mean": 0.0,
+      "relative_constraint_std": 3.7765834492638134e-07,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "tr"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666666,
+        0.1,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "1",
+          "point_type": "trbest",
+          "t": "1"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.014708567748067534,
+        "novel_configuration": false,
+        "objective_beta": 0.05,
+        "objective_delta_mean": 0.0,
+        "objective_delta_std": 3.7765834492638134e-07,
+        "relative_constraint_mean": 0.0,
+        "relative_constraint_std": 3.7765834492638134e-07,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "tr"
+      },
+      "observed_until": 92,
+      "phase_id": "phase-1",
+      "region": 0
+    }
+  },
+  {
+    "kind": "onlinetune_original_direction_fallback",
+    "payload": {
+      "reason": "adapter without offline fANOVA; upstream fallback to random direction"
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "best",
+      "relative_gain": 0.01857568098113212,
+      "trial_id": "50ed6a17ff0141719c04ed7445adb0c0",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "1",
+        "point_type": "best",
+        "t": "2"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.014708567748067534,
+      "novel_configuration": false,
+      "objective_beta": 0.05,
+      "objective_delta_mean": 0.0,
+      "objective_delta_std": 3.7765834492638134e-07,
+      "relative_constraint_mean": 0.0,
+      "relative_constraint_std": 3.7765834492638134e-07,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "best"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666666,
+        0.1,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "1",
+          "point_type": "best",
+          "t": "2"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.014708567748067534,
+        "novel_configuration": false,
+        "objective_beta": 0.05,
+        "objective_delta_mean": 0.0,
+        "objective_delta_std": 3.7765834492638134e-07,
+        "relative_constraint_mean": 0.0,
+        "relative_constraint_std": 3.7765834492638134e-07,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "best"
+      },
+      "observed_until": 176,
+      "phase_id": "phase-1",
+      "region": 0
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "line",
+      "relative_gain": 0.03609982931862515,
+      "trial_id": "c1584ff37e4f40278e324dd837e235d3",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "2",
+        "point_type": "linebest",
+        "t": "3"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.014708567748067534,
+      "novel_configuration": false,
+      "objective_beta": 0.05,
+      "objective_delta_mean": 0.0,
+      "objective_delta_std": 3.7765834492638134e-07,
+      "relative_constraint_mean": 0.0,
+      "relative_constraint_std": 3.7765834492638134e-07,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "line"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666668,
+        0.1,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "2",
+          "point_type": "linebest",
+          "t": "3"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.014708567748067534,
+        "novel_configuration": false,
+        "objective_beta": 0.05,
+        "objective_delta_mean": 0.0,
+        "objective_delta_std": 3.7765834492638134e-07,
+        "relative_constraint_mean": 0.0,
+        "relative_constraint_std": 3.7765834492638134e-07,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "line"
+      },
+      "observed_until": 260,
+      "phase_id": "phase-1",
+      "region": 0
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "best",
+      "relative_gain": 0.020020691297333068,
+      "trial_id": "81c34df2481d48998d2329e523b4e0f5",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "2",
+        "point_type": "best",
+        "t": "4"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.014708567748067534,
+      "novel_configuration": false,
+      "objective_beta": 0.05,
+      "objective_delta_mean": 0.0,
+      "objective_delta_std": 3.7765834492638134e-07,
+      "relative_constraint_mean": 0.0,
+      "relative_constraint_std": 3.7765834492638134e-07,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "best"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666668,
+        0.1,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "2",
+          "point_type": "best",
+          "t": "4"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.014708567748067534,
+        "novel_configuration": false,
+        "objective_beta": 0.05,
+        "objective_delta_mean": 0.0,
+        "objective_delta_std": 3.7765834492638134e-07,
+        "relative_constraint_mean": 0.0,
+        "relative_constraint_std": 3.7765834492638134e-07,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "best"
+      },
+      "observed_until": 344,
+      "phase_id": "phase-1",
+      "region": 0
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "tr",
+      "relative_gain": 0.004646659543504823,
+      "trial_id": "848be5fdcacd471887e88ca02f2cec39",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_region_rebased",
+    "payload": {
+      "anchor": 0.014708567748067534,
+      "constraint_training_ids": [
+        "41af09e70bfe460da58d00338b1bb709",
+        "50ed6a17ff0141719c04ed7445adb0c0",
+        "c1584ff37e4f40278e324dd837e235d3",
+        "81c34df2481d48998d2329e523b4e0f5",
+        "848be5fdcacd471887e88ca02f2cec39",
+        "c938939335c14305b72a73662d423685"
+      ],
+      "records": 6,
+      "region": 0,
+      "training_ids": [
+        "41af09e70bfe460da58d00338b1bb709",
+        "50ed6a17ff0141719c04ed7445adb0c0",
+        "c1584ff37e4f40278e324dd837e235d3",
+        "81c34df2481d48998d2329e523b4e0f5",
+        "848be5fdcacd471887e88ca02f2cec39",
+        "c938939335c14305b72a73662d423685"
+      ]
+    }
+  },
+  {
+    "kind": "onlinetune_no_llm_reflection",
+    "payload": {
+      "phase_id": "phase-1"
+    }
+  },
+  {
+    "kind": "onlinetune_context_clusters",
+    "payload": {
+      "centers": {
+        "0": [
+          1.0,
+          0.0,
+          0.9000000000000025,
+          0.09999999999999976,
+          0.0,
+          0.016383999999999965,
+          0.02499999999999994,
+          0.966666666666668,
+          0.09999999999999976,
+          0.34708067508455526
+        ],
+        "1": [
+          1.0,
+          0.0,
+          0.10000000000000003,
+          0.8999999999999997,
+          0.0,
+          0.016384000000000006,
+          0.22499999999999992,
+          0.6999999999999997,
+          0.8999999999999997,
+          0.34708067508455465
+        ]
+      },
+      "dbscan_label_to_region": {
+        "0": 0,
+        "1": 1
+      },
+      "svm_fits": 1,
+      "windows": 175
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "tr",
+      "relative_gain": 0.0,
+      "trial_id": "df3ad919f8914d12abeda433401c6689",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_region_activated",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.1,
+        0.9,
+        0.0,
+        0.016384,
+        0.225,
+        0.7,
+        0.9,
+        0.34708067508455476
+      ],
+      "measured_anchor": 0.012964598375022425,
+      "phase_id": "phase-2",
+      "region": 1,
+      "retained_ids": [
+        "df3ad919f8914d12abeda433401c6689"
+      ],
+      "reused_model": false,
+      "routing": {
+        "centers": {
+          "0": [
+            1.0,
+            0.0,
+            0.9000000000000025,
+            0.09999999999999976,
+            0.0,
+            0.016383999999999965,
+            0.02499999999999994,
+            0.966666666666668,
+            0.09999999999999976,
+            0.34708067508455526
+          ],
+          "1": [
+            1.0,
+            0.0,
+            0.10000000000000003,
+            0.8999999999999997,
+            0.0,
+            0.016384000000000006,
+            0.22499999999999992,
+            0.6999999999999997,
+            0.8999999999999997,
+            0.34708067508455465
+          ]
+        },
+        "dbscan_label_to_region": {
+          "0": 0,
+          "1": 1
+        },
+        "svm_fits": 1,
+        "windows": 175
+      }
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "1",
+        "point_type": "trbest",
+        "t": "1"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.012964598375022425,
+      "novel_configuration": false,
+      "objective_beta": 0.05,
+      "objective_delta_mean": 0.0,
+      "objective_delta_std": 4.094172715840687e-07,
+      "relative_constraint_mean": 0.0,
+      "relative_constraint_std": 4.094172715840687e-07,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "tr"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.1,
+        0.9,
+        0.0,
+        0.016384,
+        0.225,
+        0.7,
+        0.9,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "1",
+          "point_type": "trbest",
+          "t": "1"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.012964598375022425,
+        "novel_configuration": false,
+        "objective_beta": 0.05,
+        "objective_delta_mean": 0.0,
+        "objective_delta_std": 4.094172715840687e-07,
+        "relative_constraint_mean": 0.0,
+        "relative_constraint_std": 4.094172715840687e-07,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "tr"
+      },
+      "observed_until": 700,
+      "phase_id": "phase-2",
+      "region": 1
+    }
+  },
+  {
+    "kind": "onlinetune_original_direction_fallback",
+    "payload": {
+      "reason": "adapter without offline fANOVA; upstream fallback to random direction"
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "best",
+      "relative_gain": -0.006118175143021734,
+      "trial_id": "40db966e16834e12bc5424b1afef5c64",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "1",
+        "point_type": "best",
+        "t": "2"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.012964598375022425,
+      "novel_configuration": false,
+      "objective_beta": 0.05,
+      "objective_delta_mean": 0.0,
+      "objective_delta_std": 4.094172715840687e-07,
+      "relative_constraint_mean": 0.0,
+      "relative_constraint_std": 4.094172715840687e-07,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "best"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.1,
+        0.9,
+        0.0,
+        0.016384,
+        0.225,
+        0.7,
+        0.9,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "1",
+          "point_type": "best",
+          "t": "2"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.012964598375022425,
+        "novel_configuration": false,
+        "objective_beta": 0.05,
+        "objective_delta_mean": 0.0,
+        "objective_delta_std": 4.094172715840687e-07,
+        "relative_constraint_mean": 0.0,
+        "relative_constraint_std": 4.094172715840687e-07,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "best"
+      },
+      "observed_until": 784,
+      "phase_id": "phase-2",
+      "region": 1
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "line",
+      "relative_gain": -0.02658974433399245,
+      "trial_id": "bad529b9a8d44f579dffeef38e0ef9c9",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "2",
+        "point_type": "linebest",
+        "t": "3"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.012964598375022425,
+      "novel_configuration": false,
+      "objective_beta": 0.05,
+      "objective_delta_mean": 0.0,
+      "objective_delta_std": 4.094172715840687e-07,
+      "relative_constraint_mean": 0.0,
+      "relative_constraint_std": 4.094172715840687e-07,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "line"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.1,
+        0.9,
+        0.0,
+        0.016384,
+        0.225,
+        0.7,
+        0.9,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "2",
+          "point_type": "linebest",
+          "t": "3"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.012964598375022425,
+        "novel_configuration": false,
+        "objective_beta": 0.05,
+        "objective_delta_mean": 0.0,
+        "objective_delta_std": 4.094172715840687e-07,
+        "relative_constraint_mean": 0.0,
+        "relative_constraint_std": 4.094172715840687e-07,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "line"
+      },
+      "observed_until": 868,
+      "phase_id": "phase-2",
+      "region": 1
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "best",
+      "relative_gain": -0.029998968040207727,
+      "trial_id": "9a97e51754a447e7ae7b82511d3004cb",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "2",
+        "point_type": "best",
+        "t": "4"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.012964598375022425,
+      "novel_configuration": false,
+      "objective_beta": 0.05,
+      "objective_delta_mean": 0.0,
+      "objective_delta_std": 4.094172715840687e-07,
+      "relative_constraint_mean": 0.0,
+      "relative_constraint_std": 4.094172715840687e-07,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "best"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.1,
+        0.9,
+        0.0,
+        0.016384,
+        0.225,
+        0.7,
+        0.9,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "2",
+          "point_type": "best",
+          "t": "4"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.012964598375022425,
+        "novel_configuration": false,
+        "objective_beta": 0.05,
+        "objective_delta_mean": 0.0,
+        "objective_delta_std": 4.094172715840687e-07,
+        "relative_constraint_mean": 0.0,
+        "relative_constraint_std": 4.094172715840687e-07,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "best"
+      },
+      "observed_until": 952,
+      "phase_id": "phase-2",
+      "region": 1
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 2,
+      "objective_training_points": 2,
+      "phase": "tr",
+      "relative_gain": -0.04026102946167242,
+      "trial_id": "e205aa2d49034531a5ded4a04acbb751",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_region_rebased",
+    "payload": {
+      "anchor": 0.012964598375022425,
+      "constraint_training_ids": [
+        "df3ad919f8914d12abeda433401c6689",
+        "40db966e16834e12bc5424b1afef5c64",
+        "bad529b9a8d44f579dffeef38e0ef9c9",
+        "9a97e51754a447e7ae7b82511d3004cb",
+        "e205aa2d49034531a5ded4a04acbb751",
+        "f747d9350306406383868579b02d1ec4"
+      ],
+      "records": 6,
+      "region": 1,
+      "training_ids": [
+        "df3ad919f8914d12abeda433401c6689",
+        "40db966e16834e12bc5424b1afef5c64",
+        "bad529b9a8d44f579dffeef38e0ef9c9",
+        "9a97e51754a447e7ae7b82511d3004cb",
+        "e205aa2d49034531a5ded4a04acbb751",
+        "f747d9350306406383868579b02d1ec4"
+      ]
+    }
+  },
+  {
+    "kind": "onlinetune_no_llm_reflection",
+    "payload": {
+      "phase_id": "phase-2"
+    }
+  },
+  {
+    "kind": "onlinetune_context_clusters",
+    "payload": {
+      "centers": {
+        "0": [
+          1.0,
+          0.0,
+          0.9000000000000029,
+          0.09999999999999988,
+          0.0,
+          0.016383999999999965,
+          0.02499999999999997,
+          0.9666666666666681,
+          0.09999999999999988,
+          0.3470806750845553
+        ],
+        "1": [
+          1.0,
+          0.0,
+          0.09999999999999976,
+          0.9000000000000025,
+          0.0,
+          0.016383999999999965,
+          0.22500000000000062,
+          0.7000000000000018,
+          0.9000000000000025,
+          0.34708067508455526
+        ]
+      },
+      "dbscan_label_to_region": {
+        "0": 0,
+        "1": 1
+      },
+      "svm_fits": 2,
+      "windows": 325
+    }
+  },
+  {
+    "kind": "onlinetune_region_rebased",
+    "payload": {
+      "anchor": 0.01496600942388661,
+      "constraint_training_ids": [
+        "41af09e70bfe460da58d00338b1bb709",
+        "50ed6a17ff0141719c04ed7445adb0c0",
+        "c1584ff37e4f40278e324dd837e235d3",
+        "81c34df2481d48998d2329e523b4e0f5",
+        "848be5fdcacd471887e88ca02f2cec39",
+        "c938939335c14305b72a73662d423685",
+        "2c7ac570227f4dbeab492be0af7d553c"
+      ],
+      "records": 7,
+      "region": 0,
+      "training_ids": [
+        "41af09e70bfe460da58d00338b1bb709",
+        "50ed6a17ff0141719c04ed7445adb0c0",
+        "c1584ff37e4f40278e324dd837e235d3",
+        "81c34df2481d48998d2329e523b4e0f5",
+        "848be5fdcacd471887e88ca02f2cec39",
+        "c938939335c14305b72a73662d423685",
+        "2c7ac570227f4dbeab492be0af7d553c"
+      ]
+    }
+  },
+  {
+    "kind": "onlinetune_region_activated",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666666,
+        0.1,
+        0.34708067508455476
+      ],
+      "measured_anchor": 0.01496600942388661,
+      "phase_id": "phase-3",
+      "region": 0,
+      "retained_ids": [
+        "41af09e70bfe460da58d00338b1bb709",
+        "50ed6a17ff0141719c04ed7445adb0c0",
+        "c1584ff37e4f40278e324dd837e235d3",
+        "81c34df2481d48998d2329e523b4e0f5",
+        "848be5fdcacd471887e88ca02f2cec39",
+        "c938939335c14305b72a73662d423685",
+        "2c7ac570227f4dbeab492be0af7d553c"
+      ],
+      "reused_model": true,
+      "routing": {
+        "centers": {
+          "0": [
+            1.0,
+            0.0,
+            0.9000000000000029,
+            0.09999999999999988,
+            0.0,
+            0.016383999999999965,
+            0.02499999999999997,
+            0.9666666666666681,
+            0.09999999999999988,
+            0.3470806750845553
+          ],
+          "1": [
+            1.0,
+            0.0,
+            0.09999999999999976,
+            0.9000000000000025,
+            0.0,
+            0.016383999999999965,
+            0.22500000000000062,
+            0.7000000000000018,
+            0.9000000000000025,
+            0.34708067508455526
+          ]
+        },
+        "dbscan_label_to_region": {
+          "0": 0,
+          "1": 1
+        },
+        "svm_fits": 2,
+        "windows": 325
+      }
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "0",
+        "point_type": "best",
+        "t": "5"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.01496600942388661,
+      "novel_configuration": false,
+      "objective_beta": 1.9423579443438406,
+      "objective_delta_mean": -2.8837276771145744e-05,
+      "objective_delta_std": 2.523891448706875e-11,
+      "relative_constraint_mean": 0.0019268514374392808,
+      "relative_constraint_std": 1.6864157820296684e-09,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "best"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666666,
+        0.1,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "0",
+          "point_type": "best",
+          "t": "5"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.01496600942388661,
+        "novel_configuration": false,
+        "objective_beta": 1.9423579443438406,
+        "objective_delta_mean": -2.8837276771145744e-05,
+        "objective_delta_std": 2.523891448706875e-11,
+        "relative_constraint_mean": 0.0019268514374392808,
+        "relative_constraint_std": 1.6864157820296684e-09,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "best"
+      },
+      "observed_until": 1300,
+      "phase_id": "phase-3",
+      "region": 0
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 8,
+      "objective_training_points": 8,
+      "phase": "tr",
+      "relative_gain": -0.045724615541428495,
+      "trial_id": "e8d50b11c2cd42418dfaaf2892532d13",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "1",
+        "point_type": "trbest",
+        "t": "6"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.01496600942388661,
+      "novel_configuration": false,
+      "objective_beta": 1.9423579443438406,
+      "objective_delta_mean": -0.0001107719955618289,
+      "objective_delta_std": 4.1543772634054037e-11,
+      "relative_constraint_mean": 0.007401571950437932,
+      "relative_constraint_std": 2.7758750817518918e-09,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "tr"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666666,
+        0.1,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "1",
+          "point_type": "trbest",
+          "t": "6"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.01496600942388661,
+        "novel_configuration": false,
+        "objective_beta": 1.9423579443438406,
+        "objective_delta_mean": -0.0001107719955618289,
+        "objective_delta_std": 4.1543772634054037e-11,
+        "relative_constraint_mean": 0.007401571950437932,
+        "relative_constraint_std": 2.7758750817518918e-09,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "tr"
+      },
+      "observed_until": 1384,
+      "phase_id": "phase-3",
+      "region": 0
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 8,
+      "objective_training_points": 8,
+      "phase": "best",
+      "relative_gain": 0.008648009010163658,
+      "trial_id": "596cbc1d533544eab55b5a78028c78d1",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "1",
+        "point_type": "best",
+        "t": "7"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.01496600942388661,
+      "novel_configuration": false,
+      "objective_beta": 1.9423579443438406,
+      "objective_delta_mean": -0.0001107719955618289,
+      "objective_delta_std": 4.1543772634054037e-11,
+      "relative_constraint_mean": 0.007401571950437932,
+      "relative_constraint_std": 2.7758750817518918e-09,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "best"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666666,
+        0.1,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "1",
+          "point_type": "best",
+          "t": "7"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.01496600942388661,
+        "novel_configuration": false,
+        "objective_beta": 1.9423579443438406,
+        "objective_delta_mean": -0.0001107719955618289,
+        "objective_delta_std": 4.1543772634054037e-11,
+        "relative_constraint_mean": 0.007401571950437932,
+        "relative_constraint_std": 2.7758750817518918e-09,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "best"
+      },
+      "observed_until": 1468,
+      "phase_id": "phase-3",
+      "region": 0
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 8,
+      "objective_training_points": 8,
+      "phase": "line",
+      "relative_gain": 0.0014860099533364104,
+      "trial_id": "ddef40b753a446b791a93c31a825f26a",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_selection",
+    "payload": {
+      "additional_data": {
+        "iteration": "2",
+        "point_type": "linebest",
+        "t": "8"
+      },
+      "constraint_beta": 0.05,
+      "measured_anchor": 0.01496600942388661,
+      "novel_configuration": false,
+      "objective_beta": 1.9423579443438406,
+      "objective_delta_mean": -0.0001107719955618289,
+      "objective_delta_std": 4.1543772634054037e-11,
+      "relative_constraint_mean": 0.007401571950437932,
+      "relative_constraint_std": 2.7758750817518918e-09,
+      "rule": "upstream_OnlineTune_SafetyMixin",
+      "source_phase": "line"
+    }
+  },
+  {
+    "kind": "onlinetune_dynamic_selection",
+    "payload": {
+      "context": [
+        1.0,
+        0.0,
+        0.9,
+        0.1,
+        0.0,
+        0.016384,
+        0.025,
+        0.9666666666666666,
+        0.1,
+        0.34708067508455476
+      ],
+      "decision": {
+        "additional_data": {
+          "iteration": "2",
+          "point_type": "linebest",
+          "t": "8"
+        },
+        "constraint_beta": 0.05,
+        "measured_anchor": 0.01496600942388661,
+        "novel_configuration": false,
+        "objective_beta": 1.9423579443438406,
+        "objective_delta_mean": -0.0001107719955618289,
+        "objective_delta_std": 4.1543772634054037e-11,
+        "relative_constraint_mean": 0.007401571950437932,
+        "relative_constraint_std": 2.7758750817518918e-09,
+        "rule": "upstream_OnlineTune_SafetyMixin",
+        "source_phase": "line"
+      },
+      "observed_until": 1552,
+      "phase_id": "phase-3",
+      "region": 0
+    }
+  },
+  {
+    "kind": "onlinetune_model_updated",
+    "payload": {
+      "constraint_training_points": 8,
+      "objective_training_points": 8,
+      "phase": "best",
+      "relative_gain": 0.032486350839553715,
+      "trial_id": "3ec7f55d123f42879d800e087e6c86c5",
+      "unique_model_configurations": 1
+    }
+  },
+  {
+    "kind": "onlinetune_region_rebased",
+    "payload": {
+      "anchor": 0.01496600942388661,
+      "constraint_training_ids": [
+        "41af09e70bfe460da58d00338b1bb709",
+        "50ed6a17ff0141719c04ed7445adb0c0",
+        "c1584ff37e4f40278e324dd837e235d3",
+        "81c34df2481d48998d2329e523b4e0f5",
+        "848be5fdcacd471887e88ca02f2cec39",
+        "c938939335c14305b72a73662d423685",
+        "2c7ac570227f4dbeab492be0af7d553c",
+        "e8d50b11c2cd42418dfaaf2892532d13",
+        "596cbc1d533544eab55b5a78028c78d1",
+        "ddef40b753a446b791a93c31a825f26a",
+        "3ec7f55d123f42879d800e087e6c86c5",
+        "90e1a6d3a3734b24bd4feb31daf9d6f9"
+      ],
+      "records": 12,
+      "region": 0,
+      "training_ids": [
+        "41af09e70bfe460da58d00338b1bb709",
+        "50ed6a17ff0141719c04ed7445adb0c0",
+        "c1584ff37e4f40278e324dd837e235d3",
+        "81c34df2481d48998d2329e523b4e0f5",
+        "848be5fdcacd471887e88ca02f2cec39",
+        "c938939335c14305b72a73662d423685",
+        "2c7ac570227f4dbeab492be0af7d553c",
+        "e8d50b11c2cd42418dfaaf2892532d13",
+        "596cbc1d533544eab55b5a78028c78d1",
+        "ddef40b753a446b791a93c31a825f26a",
+        "3ec7f55d123f42879d800e087e6c86c5",
+        "90e1a6d3a3734b24bd4feb31daf9d6f9"
+      ]
+    }
+  },
+  {
+    "kind": "onlinetune_no_llm_reflection",
+    "payload": {
+      "phase_id": "phase-3"
+    }
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "source_archive_sha256": "9233aa94bbf72d2fe248d8a341962aea49076ac1c30336ca20e3cef97a65490b",
+  "source_revision": "9cf60db274a582a868a2b41af1c2106dfe667bbf",
+  "run_state": {
+    "status": "completed",
+    "stage": "completed",
+    "seed": 43,
+    "smoke": false,
+    "started_at_utc": "2026-11-27T18:17:29.888415+00:00",
+    "llm_calls": 0,
+    "finished_at_utc": "2026-11-27T18:51:21.896526+00:00"
+  },
+  "counts": {
+    "offered": 18000,
+    "submitted": 18000,
+    "dropped": 0,
+    "succeeded": 18000,
+    "failed": 0
+  },
+  "valid_observations": 18,
+  "trial_slots": 18,
+  "unique_configurations": 1,
+  "dynamic_checks": {
+    "regions": 2,
+    "svm_fits": 2,
+    "model_reuse_events": 1,
+    "active_context": [
+      1.0,
+      0.0,
+      0.9,
+      0.1,
+      0.0,
+      0.016384,
+      0.025,
+      0.9666666666666666,
+      0.1,
+      0.34708067508455476
+    ],
+    "actual_encoder": "observed SQL structure, not pretrained LSTM"
+  },
+  "postcheck": true,
+  "initial_configuration_restored": true,
+  "llm_calls": 0,
+  "adapter": {
+    "name": "OnlineTune dynamic adapter",
+    "source_revision": "88ba8c35f554bc4a4f7f1a88257b3e8928f87a39",
+    "context": [
+      "read_share",
+      "write_share",
+      "range_scan_share",
+      "range_sort_share",
+      "point_read_share",
+      "mean_range_fraction",
+      "mean_limit_fraction",
+      "aggregate_fraction",
+      "nested_select_share",
+      "log_offered_rate"
+    ],
+    "encoder": "observed SQL structure, not unavailable pretrained LSTM or future phase labels",
+    "routing": "past windows only; StandardScaler/PCA3/DBSCAN(.7,8), RBF SVM gamma=auto",
+    "novel_context": "provisional region when distance to observed region center exceeds .25",
+    "default_reference": "budgeted measured phase anchor; historical raw utilities recentered on activation",
+    "model_reuse": "region keyed raw observations and upstream GP hyperparameters retained on return",
+    "cross_region_transfer": "objective-only transfer for >10% gains above observed 90th percentile",
+    "objective": "inverse measured P95; original objective-difference and relative-constraint GPs",
+    "llm_calls": 0
+  },
+  "configuration_mutations": 0,
+  "candidate_proposals": 12,
+  "non_novel_proposals": 12,
+  "positive_predicted_constraint_ucb_at_selected_point": 12,
+  "diagnostic_note": "Positive model bound at the fallback point is a cold-start/safety diagnostic, not measured DB failure.",
+  "local_extended_archive_sha256": "d24d2b3b8b2c8740175aba967befaebcd27b76682b0ea15c60035807a75cd22b",
+  "local_immutable_archive": "runs/onlinetune-dynamic-20261128/source-d24d2b3b8b2c.tar.gz",
+  "local_archive_request_hash_matches": true
+}

@@ -1,0 +1,36 @@
+{
+  "complete": true,
+  "counts": {
+    "offered": 4800,
+    "submitted": 4800,
+    "dropped": 0,
+    "succeeded": 4800,
+    "failed": 0
+  },
+  "error": null,
+  "valid_observations": 18,
+  "control_flow_completed": true,
+  "closed_loop_completed": true,
+  "initial_configuration_restored": true,
+  "onlinetune_dynamic": {
+    "regions": 2,
+    "svm_fits": 1,
+    "model_reuse_events": 1,
+    "active_context": [
+      1.0,
+      0.0,
+      0.9,
+      0.1,
+      0.0,
+      0.016384,
+      0.025,
+      0.9666666666666668,
+      0.1,
+      0.34708067508455476
+    ],
+    "actual_encoder": "observed SQL structure, not pretrained LSTM"
+  },
+  "llm_calls": 0,
+  "smoke": true,
+  "postcheck": true
+}

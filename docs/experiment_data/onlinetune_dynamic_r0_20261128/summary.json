@@ -1,0 +1,181 @@
+{
+  "simulated": false,
+  "mode": "dynamic_tuning_pilot",
+  "plan": {
+    "scenario": "composition",
+    "phase_seconds": 600,
+    "window_seconds": 4,
+    "slices": 2,
+    "base_rate": 10,
+    "high_rate": 30,
+    "tables": 4,
+    "table_size": 2000000,
+    "workers": 4,
+    "queue_size": 32,
+    "seed": 43,
+    "max_emit_lag_seconds": 0.5,
+    "read_percent": 100,
+    "query_profile": "range-mixed",
+    "range_rows": 32768,
+    "top_k": 8192,
+    "steady_scan_percent": 50,
+    "single_slice": false
+  },
+  "schedule_hash": "e575307360275b6f56a7297f2804795e3674baeaebc9cad28374b88a0150a9f5",
+  "counts": {
+    "offered": 18000,
+    "submitted": 18000,
+    "dropped": 0,
+    "succeeded": 18000,
+    "failed": 0
+  },
+  "phase_ready": [
+    {
+      "end": 8,
+      "phase_id": "phase-1"
+    },
+    {
+      "end": 616,
+      "phase_id": "phase-2"
+    },
+    {
+      "end": 1216,
+      "phase_id": "phase-3"
+    }
+  ],
+  "max_emit_lag_seconds": 0.08044820427895161,
+  "complete": true,
+  "three_phases_detected": true,
+  "expected_phase_count": 3,
+  "phase_count_matches_plan": true,
+  "detector_event_counts": {
+    "phase_ready": 3,
+    "change_suspected": 2,
+    "change_confirmed": 2
+  },
+  "detector_matches_plan": true,
+  "wall_seconds": 1800.365970134735,
+  "replay_started_at_utc": "2026-11-27T18:21:01.732492+00:00",
+  "llm_calls": 0,
+  "configuration_mutations": 0,
+  "data_snapshot_restored": false,
+  "objective": "p95_latency_ms:minimize",
+  "backend": "onlinetune",
+  "phases": [
+    {
+      "phase_id": "phase-1",
+      "ready_at": 8,
+      "finished_at": 512.8577219098806,
+      "baseline_value": 67.987585,
+      "search_best_value": 65.618759,
+      "best_config": {
+        "innodb_buffer_pool_size": 1073741824,
+        "innodb_io_capacity": 200,
+        "innodb_io_capacity_max": 2000,
+        "sort_buffer_size": 262144
+      },
+      "verification_values": [
+        67.184719
+      ],
+      "valid_candidates": 4
+    },
+    {
+      "phase_id": "phase-2",
+      "ready_at": 616,
+      "finished_at": 1120.8416720032692,
+      "baseline_value": 77.133126,
+      "search_best_value": 77.133126,
+      "best_config": {
+        "innodb_buffer_pool_size": 1073741824,
+        "innodb_io_capacity": 200,
+        "innodb_io_capacity_max": 2000,
+        "sort_buffer_size": 262144
+      },
+      "verification_values": [
+        77.42057
+      ],
+      "valid_candidates": 4
+    },
+    {
+      "phase_id": "phase-3",
+      "ready_at": 1216,
+      "finished_at": 1720.8502222299576,
+      "baseline_value": 66.818079,
+      "search_best_value": 64.715702,
+      "best_config": {
+        "innodb_buffer_pool_size": 1073741824,
+        "innodb_io_capacity": 200,
+        "innodb_io_capacity_max": 2000,
+        "sort_buffer_size": 262144
+      },
+      "verification_values": [
+        65.819789
+      ],
+      "valid_candidates": 4
+    }
+  ],
+  "budget": {
+    "limits": {
+      "trials": 18,
+      "wall_seconds": 1980,
+      "llm_calls": 0,
+      "llm_tokens": 0,
+      "recovery_reserve_seconds": 30
+    },
+    "trial_slots_used": 18,
+    "llm_calls": 0,
+    "llm_tokens_or_reserved": 0,
+    "elapsed_seconds": 1800.8706121593714
+  },
+  "error": null,
+  "trial_statuses": {
+    "measured": 18
+  },
+  "valid_observations": 18,
+  "prediction_observations": 0,
+  "predicted_search_observations": 0,
+  "predicted_verification_observations": 0,
+  "gp_fit_events": 0,
+  "reflection_commits": 0,
+  "llm_api_attempts": 0,
+  "heuristic_role_invocations": 0,
+  "method": "OnlineTune",
+  "ablation": "full",
+  "shared_change_trigger": true,
+  "acceptance_contract": "control_flow_v2_resize_stable",
+  "control_flow_completed": true,
+  "closed_loop_completed": true,
+  "gp_selected_execution_exercised": false,
+  "conservative_no_trial_phases": [],
+  "is_thesis_evidence": false,
+  "note": "真实动态闭环试运行；未经正式校准、快照复位或方法对比，不能声称性能优势。",
+  "onlinetune_dynamic": {
+    "regions": 2,
+    "svm_fits": 2,
+    "model_reuse_events": 1,
+    "active_context": [
+      1.0,
+      0.0,
+      0.9,
+      0.1,
+      0.0,
+      0.016384,
+      0.025,
+      0.9666666666666666,
+      0.1,
+      0.34708067508455476
+    ],
+    "actual_encoder": "observed SQL structure, not pretrained LSTM"
+  },
+  "final_buffer_pool_ready": {
+    "status_code": 0,
+    "configured_bytes": 1073741824,
+    "page_accounted_bytes": 1073741824,
+    "expected_bytes": 1073741824,
+    "polls": 2,
+    "wait_seconds": 0.2750428766012192
+  },
+  "initial_configuration_restored": true,
+  "configuration_mutation_definition": "logical_config_changes_including_recovery",
+  "final_config_sha256": "fc4c0279d9c6c7ff843b5404a045660d4c835478addbaaf2a040653f82dc40c3"
+}

@@ -1,0 +1,16 @@
+{
+  "synthetic_software_check_only": true,
+  "database_calls": 0,
+  "llm_calls": 0,
+  "routes": [
+    0,
+    1,
+    0
+  ],
+  "regions": 2,
+  "svm_fits": 2,
+  "model_reuses": 1,
+  "objective_transfers": 1,
+  "records": 12,
+  "source": "9cf60db"
+}

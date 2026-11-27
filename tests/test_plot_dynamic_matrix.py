@@ -3,10 +3,16 @@ import json
 from pathlib import Path
 import tempfile
 
-from tools.plot_dynamic_matrix import service_metrics, collect
+from tools.plot_dynamic_matrix import service_metrics, collect, configuration_counts
 
 
 class DynamicPlotTests(unittest.TestCase):
+    def test_failed_configuration_is_attempted_not_successfully_measured(self):
+        rows = [{"config": {"x": 1}, "status": "measured", "complete": True, "effective": True},
+                {"config": {"x": 2}, "status": "execution_failed", "complete": False, "effective": False}]
+        self.assertEqual(configuration_counts(rows), {
+            "unique_measured_configurations": 1, "unique_attempted_configurations": 2})
+
     @staticmethod
     def requests():
         # 人工公式测试仅在内存中；不写入任何论文实验数据目录。

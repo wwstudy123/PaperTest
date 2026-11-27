@@ -1,0 +1,6 @@
+method,overall_p95_ms,mean_ms,successful_requests,valid_observations,unique_measured_configurations,unique_attempted_configurations,trial_slots_used,failed_config_observations,llm_calls,tokens,failed,dropped,control_flow_completed,closed_loop_completed,p95_reduction_vs_default_pct
+Default,72.41536565124989,45.48353718055619,18000,0,1,1,0,0,0,0,0,0,,,0.0
+AgenticDB,53.825302049517624,34.34040941711929,18000,15,7,7,15,0,9,68655,0,0,True,True,25.67143510848432
+AgentTune,56.15293495357035,36.80700693900386,18000,18,12,12,18,0,33,52223,0,0,True,True,22.457154709400882
+ADMTune,59.498214349150636,38.053858664300705,18000,12,7,9,14,2,12,15735,0,0,True,False,17.837583482361797
+OnlineTune,73.69901463389397,46.1867960318923,18000,18,1,1,18,0,0,0,0,0,True,True,-1.7726196244400638
