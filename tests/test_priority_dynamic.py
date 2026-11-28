@@ -1,5 +1,5 @@
 import unittest
-from tools.run_priority_dynamic import JOBS, enough_time
+from tools.run_priority_dynamic import DISPLAY, JOBS, enough_time
 
 
 class PriorityDynamicTests(unittest.TestCase):
@@ -13,6 +13,10 @@ class PriorityDynamicTests(unittest.TestCase):
         self.assertEqual([v for _, v in JOBS[4:]],
                          ["no_history", "no_gp", "single_slice", "no_reflection"])
         self.assertTrue(all(m == "ADMTune" for m, _ in JOBS[4:]))
+
+    def test_single_slice_is_not_labelled_as_removing_all_monitoring(self):
+        self.assertEqual(DISPLAY["ADMTune-single_slice"], "Single time slice")
+        self.assertEqual(DISPLAY["ADMTune-no_gp"], "w/o GP prefilter")
 
 
 if __name__ == "__main__":

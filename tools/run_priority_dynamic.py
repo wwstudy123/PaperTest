@@ -23,6 +23,10 @@ JOBS = (
     ("ADMTune", "single_slice"), ("ADMTune", "no_reflection"),
 )
 
+DISPLAY = {"ADMTune": "ADMTune", "ADMTune-no_history": "w/o history reuse",
+           "ADMTune-no_gp": "w/o GP prefilter", "ADMTune-single_slice": "Single time slice",
+           "ADMTune-no_reflection": "w/o text reflection"}
+
 
 def enough_time(deadline, now):
     # 留35分钟服务/核验时间及10分钟恢复、绘图余量，不缩短任何方法的协议。
@@ -114,11 +118,11 @@ def make_report(output, state, seed):
         plt.rcParams.update({"font.family": "DejaVu Serif", "font.size": 9, "pdf.fonttype": 42})
         fig, axes = plt.subplots(1, 2, figsize=(10, 3.8))
         for row in ablations:
-            label = row["method"].replace("ADMTune-", "w/o ").replace("no_", "")
+            label = DISPLAY[row["method"]]
             ws = [w for w in ws_all if w["method"] == row["method"]]
             axes[0].plot([w["end_s"] / 60 for w in ws], [w["p95_ms"] for w in ws],
                          label=label, lw=1.0)
-        labels = [r["method"].replace("ADMTune-", "").replace("no_", "w/o ") for r in ablations]
+        labels = [DISPLAY[r["method"]] for r in ablations]
         axes[1].bar(range(len(ablations)), [r["overall_p95_ms"] for r in ablations],
                     color=["#d62728"] + ["#999999"] * (len(ablations) - 1))
         axes[1].set(xticks=range(len(labels)), xticklabels=labels, ylabel="Whole-run P95 latency (ms)")
